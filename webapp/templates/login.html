@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">Acesso ao Sistema</div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label" for="user_id">Usuário</label>
+            <select class="form-select" id="user_id" name="user_id" required>
+              <option value="" selected disabled>Selecione...</option>
+              {% for user in users %}
+              <option value="{{ user.id }}">{{ user.name }} ({{ user.role.value }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">Entrar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

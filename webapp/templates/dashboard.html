@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Painel de Controle</h1>
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted text-uppercase">Itens cadastrados</h6>
+        <p class="display-6 fw-bold">{{ items|length }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted text-uppercase">Categorias</h6>
+        <p class="display-6 fw-bold">{{ categories|length }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted text-uppercase">Alertas ativos</h6>
+        <p class="display-6 fw-bold">{{ notifications|length }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted text-uppercase">Itens em atenção</h6>
+        <p class="display-6 fw-bold text-warning">{{ low_stock|length }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white">
+        <h5 class="card-title mb-0">Itens com estoque crítico</h5>
+      </div>
+      <div class="card-body">
+        {% if low_stock %}
+        <ul class="list-group list-group-flush">
+          {% for item in low_stock %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span>{{ item.name }}</span>
+            <span class="badge bg-warning text-dark">{{ item.quantity }} un.</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted">Nenhum item abaixo do mínimo.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white">
+        <h5 class="card-title mb-0">Últimas notificações</h5>
+      </div>
+      <div class="card-body">
+        {% if notifications %}
+        <ul class="list-group list-group-flush">
+          {% for notification in notifications %}
+          <li class="list-group-item">
+            <div class="d-flex justify-content-between">
+              <span class="badge bg-{{ 'danger' if notification.severity == 'error' else ('warning' if notification.severity == 'warning' else 'secondary') }}">{{ notification.severity|capitalize }}</span>
+              <small class="text-muted">{{ notification.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+            </div>
+            <p class="mb-0 mt-2">{{ notification.message }}</p>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted">Nenhum alerta recente.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Movimentações recentes</h5>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('movements') }}">Ver todas</a>
+      </div>
+      <div class="card-body">
+        {% if movements %}
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Item</th>
+                <th>Quantidade</th>
+                <th>Tipo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for movement in movements|reverse %}
+              <tr>
+                <td>{{ movement.occurred_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ item_lookup[movement.item_id].name if movement.item_id in item_lookup else movement.item_id }}</td>
+                <td class="fw-semibold {{ 'text-success' if movement.quantity > 0 else 'text-danger' }}">{{ movement.quantity }}</td>
+                <td>{{ movement.movement_type|capitalize }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Sem movimentações registradas.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

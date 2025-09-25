@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Auditoria</h1>
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if log %}
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Usuário</th>
+            <th>Ação</th>
+            <th>Entidade</th>
+            <th>Detalhes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in log|reverse %}
+          <tr>
+            <td>{{ entry.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+            <td>{{ users[entry.user_id].name if entry.user_id in users else entry.user_id }}</td>
+            <td>{{ entry.action }}</td>
+            <td>{{ entry.entity }}</td>
+            <td><code>{{ entry.payload }}</code></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">Nenhuma ação registrada até o momento.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

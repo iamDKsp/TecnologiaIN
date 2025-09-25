@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white">
+        <h5 class="mb-0">Nova categoria</h5>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label" for="name">Nome</label>
+            <input class="form-control" id="name" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="description">Descrição</label>
+            <textarea class="form-control" id="description" name="description" rows="2"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="parent_id">Categoria pai</label>
+            <select class="form-select" id="parent_id" name="parent_id">
+              <option value="">Nenhuma</option>
+              {% for category in categories %}
+              <option value="{{ category.id }}">{{ category.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-primary" type="submit">Criar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white">
+        <h5 class="mb-0">Categorias cadastradas</h5>
+      </div>
+      <div class="card-body">
+        {% if categories %}
+        <ul class="list-group list-group-flush">
+          {% for category in categories %}
+          <li class="list-group-item">
+            <div class="fw-semibold">{{ category.name }}</div>
+            {% if category.description %}
+            <small class="text-muted">{{ category.description }}</small>
+            {% endif %}
+            {% if category.parent_id %}
+            <div><span class="badge bg-light text-dark">Subcategoria</span></div>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted mb-0">Nenhuma categoria cadastrada.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

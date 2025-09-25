@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="mb-0">Itens de Inventário</h1>
+  <a class="btn btn-primary" href="{{ url_for('new_item') }}">Novo item</a>
+</div>
+
+<form class="row g-3 mb-4" method="get">
+  <div class="col-md-6 col-lg-4">
+    <label class="form-label" for="categoria">Filtrar por categoria</label>
+    <select class="form-select" id="categoria" name="categoria" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for category in categories %}
+      <option value="{{ category.id }}" {% if selected_category == category.id %}selected{% endif %}>{{ category.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Categoria</th>
+        <th>Quantidade</th>
+        <th>Mínimo</th>
+        <th>Localização</th>
+        <th>Fornecedor</th>
+        <th>Tags</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>
+          <div class="fw-semibold">{{ item.name }}</div>
+          <small class="text-muted">{{ item.description }}</small>
+        </td>
+        <td>{{ category_lookup[item.category_id].name if item.category_id in category_lookup else '—' }}</td>
+        <td class="fw-semibold {{ 'text-danger' if item.quantity <= item.minimum_quantity else '' }}">{{ item.quantity }}</td>
+        <td>{{ item.minimum_quantity }}</td>
+        <td>{{ item.location }}</td>
+        <td>{{ item.supplier or '—' }}</td>
+        <td>
+          {% if item.tags %}
+            {% for tag in item.tags|list|sort %}
+            <span class="badge bg-light text-dark me-1">{{ tag }}</span>
+            {% endfor %}
+          {% else %}
+          <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="text-center text-muted">Nenhum item encontrado.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

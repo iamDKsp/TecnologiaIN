@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Alertas e notificações</h1>
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if notifications %}
+    <ul class="list-group list-group-flush">
+      {% for notification in notifications %}
+      <li class="list-group-item">
+        <div class="d-flex justify-content-between">
+          <span class="badge bg-{{ 'danger' if notification.severity == 'error' else ('warning' if notification.severity == 'warning' else 'secondary') }}">{{ notification.severity|capitalize }}</span>
+          <small class="text-muted">{{ notification.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+        </div>
+        <p class="mb-0 mt-2">{{ notification.message }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0">Nenhuma notificação registrada.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
