@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="page-title display-5 fw-bold text-gradient mb-4">Painel de Controle</h1>
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card surface-card shadow-lg h-100">
+      <div class="card-body">
+        <h6 class="text-muted text-uppercase">Valor total em estoque</h6>
+        <p class="display-6 fw-bold">{{ total_inventory_display }}</p>
+        <small class="text-muted">Somatório de quantidade x valor de aquisição.</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card surface-card shadow-lg h-100">
+      <div class="card-body">
+        <h6 class="text-muted text-uppercase">Itens cadastrados</h6>
+        <p class="display-6 fw-bold">{{ items|length }}</p>
+        <small class="text-muted">{{ categories|length }} categoria{% if categories|length != 1 %}s{% endif %} ativas.</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card surface-card shadow-lg h-100">
+      <div class="card-body">
+        <h6 class="text-muted text-uppercase">Tarefas pendentes</h6>
+        <p class="display-6 fw-bold">{{ task_status_summary.get(TaskStatus.PENDING, 0) }}</p>
+        <small class="text-muted">{{ task_status_summary.get(TaskStatus.IN_PROGRESS, 0) }} em andamento.</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card surface-card shadow-lg h-100">
+      <div class="card-body">
+        <h6 class="text-muted text-uppercase">Itens em atenção</h6>
+        <p class="display-6 fw-bold text-warning">{{ low_stock|length }}</p>
+        <small class="text-muted">{{ notifications|length }} alerta{% if notifications|length != 1 %}s{% endif %} ativos.</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-1">
+  <div class="col-lg-6">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0">
+        <h5 class="card-title mb-0">Valor por categoria</h5>
+      </div>
+      <div class="card-body">
+        {% if value_chart_labels %}
+        <canvas id="valueByCategoryChart" height="220"></canvas>
+        {% else %}
+        <p class="text-muted mb-0">Cadastre itens com valores de aquisição para visualizar este gráfico.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0">
+        <h5 class="card-title mb-0">Itens por setor (tags)</h5>
+      </div>
+      <div class="card-body">
+        {% if sector_chart_values and sector_chart_values|sum %}
+        <canvas id="sectorTagChart" height="220"></canvas>
+        {% else %}
+        <p class="text-muted mb-0">Associe tags de setor (Comercial, Marketing, Assistência, Financeiro) para acompanhar a distribuição.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0">
+        <h5 class="card-title mb-0">Itens com estoque crítico</h5>
+      </div>
+      <div class="card-body">
+        {% if low_stock %}
+        <ul class="list-group list-group-flush">
+          {% for item in low_stock %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span>{{ item.name }}</span>
+            <span class="badge bg-warning text-dark">{{ item.quantity }} un.</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted">Nenhum item abaixo do mínimo.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0">
+        <h5 class="card-title mb-0">Últimas notificações</h5>
+      </div>
+      <div class="card-body">
+        {% if notifications %}
+        <ul class="list-group list-group-flush">
+          {% for notification in notifications %}
+          <li class="list-group-item">
+            <div class="d-flex justify-content-between">
+              <span class="badge bg-{{ 'danger' if notification.severity == 'error' else ('warning' if notification.severity == 'warning' else 'secondary') }}">{{ notification.severity|capitalize }}</span>
+              <small class="text-muted">{{ notification.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+            </div>
+            <p class="mb-0 mt-2">{{ notification.message }}</p>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted">Nenhum alerta recente.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <div class="col-12">
+    <div class="card shadow-lg surface-card">
+      <div class="card-header border-0 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Movimentações recentes</h5>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('movements') }}">Ver todas</a>
+      </div>
+      <div class="card-body">
+        {% if movements %}
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Item</th>
+                <th>Quantidade</th>
+                <th>Tipo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for movement in movements|reverse %}
+              <tr>
+                <td>{{ movement.occurred_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ item_lookup[movement.item_id].name if movement.item_id in item_lookup else movement.item_id }}</td>
+                <td class="fw-semibold {{ 'text-success' if movement.quantity > 0 else 'text-danger' }}">{{ movement.quantity }}</td>
+                <td>{{ movement.movement_type|capitalize }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Sem movimentações registradas.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    const styles = getComputedStyle(document.documentElement);
+    const accent = (styles.getPropertyValue('--accent') || '#6366f1').trim();
+    const primary = (styles.getPropertyValue('--primary') || '#22d3ee').trim();
+    const warning = (styles.getPropertyValue('--warning') || '#f97316').trim();
+    const success = (styles.getPropertyValue('--success') || '#22c55e').trim();
+
+    const valueLabels = {{ value_chart_labels|tojson }};
+    const valueData = {{ value_chart_values|tojson }};
+    const valueCanvas = document.getElementById('valueByCategoryChart');
+    if (valueCanvas && valueLabels.length) {
+      new Chart(valueCanvas, {
+        type: 'bar',
+        data: {
+          labels: valueLabels,
+          datasets: [
+            {
+              label: 'Valor total (R$)',
+              data: valueData,
+              backgroundColor: accent || '#6366f1',
+              borderRadius: 12,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback(value) {
+                  return `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
+                },
+              },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+          },
+        },
+      });
+    }
+
+    const sectorLabels = {{ sector_chart_labels|tojson }};
+    const sectorData = {{ sector_chart_values|tojson }};
+    const sectorCanvas = document.getElementById('sectorTagChart');
+    if (sectorCanvas && sectorData.some((value) => value > 0)) {
+      new Chart(sectorCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: sectorLabels,
+          datasets: [
+            {
+              data: sectorData,
+              backgroundColor: [
+                primary || '#22d3ee',
+                accent || '#6366f1',
+                success || '#22c55e',
+                warning || '#f97316',
+              ],
+              borderWidth: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { usePointStyle: true },
+            },
+          },
+        },
+      });
+    }
+  })();
+</script>
+{% endblock %}

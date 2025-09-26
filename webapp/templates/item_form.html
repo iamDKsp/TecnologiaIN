@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Cadastro de Item</h1>
+<form method="post" class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label" for="name">Nome</label>
+    <input class="form-control" id="name" name="name" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label" for="category_id">Categoria</label>
+    <select class="form-select" id="category_id" name="category_id" required>
+      <option value="" selected disabled>Selecione...</option>
+      {% for category in categories %}
+      <option value="{{ category.id }}">{{ category.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-12">
+    <label class="form-label" for="description">Descrição</label>
+    <textarea class="form-control" id="description" name="description" rows="2" required></textarea>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label" for="quantity">Quantidade</label>
+    <input class="form-control" id="quantity" name="quantity" type="number" min="0" value="0" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label" for="minimum_quantity">Quantidade mínima</label>
+    <input class="form-control" id="minimum_quantity" name="minimum_quantity" type="number" min="0" value="0" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label" for="usage_status">Status de uso</label>
+    <select class="form-select" id="usage_status" name="usage_status">
+      {% for status in usage_statuses %}
+      <option value="{{ status.value }}" {% if status == ItemUsageStatus.AVAILABLE %}selected{% endif %}>
+        {{ status.label.upper() }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label" for="serial_number">Número de série</label>
+    <input class="form-control" id="serial_number" name="serial_number">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label" for="location">Localização</label>
+    <input class="form-control" id="location" name="location" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label" for="supplier">Fornecedor</label>
+    <input class="form-control" id="supplier" name="supplier">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label" for="acquisition_value">Valor de aquisição</label>
+    <input class="form-control" id="acquisition_value" name="acquisition_value" type="number" min="0" step="0.01" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label" for="purchase_date">Data de compra</label>
+    <input class="form-control" id="purchase_date" name="purchase_date" type="date">
+  </div>
+  <div class="col-12">
+    <label class="form-label" for="tagBuilder">Tags</label>
+    <p class="form-text">Adicione etiquetas coloridas para agrupar ou priorizar itens.</p>
+    <div class="tag-builder" id="tagBuilder">
+      <div class="tag-row row g-2 align-items-center mb-2">
+        <div class="col-md-6">
+          <input
+            class="form-control"
+            name="tag_names[]"
+            placeholder="Nome da tag"
+          >
+        </div>
+        <div class="col-md-4">
+          <input
+            class="form-control-color w-100"
+            name="tag_colors[]"
+            title="Cor da tag"
+            type="color"
+            value="#14b8a6"
+          >
+        </div>
+        <div class="col-md-2 text-md-end">
+          <button class="btn btn-outline-danger btn-sm remove-tag mt-2 mt-md-0" type="button">Remover</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-sm btn-outline-primary" id="addTag" type="button">Adicionar tag</button>
+    {% if tag_definitions %}
+    <div class="tag-preset-collection mt-3" aria-label="Tags pré-definidas">
+      <p class="form-text mb-2">Selecione uma tag pré-definida para preencher automaticamente.</p>
+      <div class="d-flex flex-wrap gap-2">
+        {% for tag in tag_definitions %}
+        <button
+          class="btn tag-preset"
+          type="button"
+          data-tag-name="{{ tag.name }}"
+          data-tag-color="{{ tag.color }}"
+          style="--tag-color: {{ tag.color }}"
+        >
+          <span class="tag-preset-swatch" aria-hidden="true"></span>
+          <span>{{ tag.name }}</span>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="col-12">
+    <label class="form-label" for="attachments">Anexos (um por linha)</label>
+    <textarea class="form-control" id="attachments" name="attachments" rows="2" placeholder="URL ou referência"></textarea>
+  </div>
+  <div class="col-12">
+    <button class="btn btn-primary" type="submit">Salvar</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('items') }}">Cancelar</a>
+  </div>
+</form>
+<script>
+  (function () {
+    const builder = document.getElementById('tagBuilder');
+    const addButton = document.getElementById('addTag');
+    if (!builder || !addButton) return;
+
+    const template = builder.querySelector('.tag-row');
+    const defaultColor = '#14b8a6';
+
+    const bindRemove = (row) => {
+      const removeButton = row.querySelector('.remove-tag');
+      if (!removeButton) return;
+      removeButton.addEventListener('click', () => {
+        const rows = builder.querySelectorAll('.tag-row');
+        if (rows.length === 1) {
+          const nameInput = row.querySelector("input[name='tag_names[]']");
+          const colorInput = row.querySelector("input[name='tag_colors[]']");
+          if (nameInput) nameInput.value = '';
+          if (colorInput) colorInput.value = defaultColor;
+          return;
+        }
+        row.remove();
+      });
+    };
+
+    const createRow = () => {
+      const clone = template.cloneNode(true);
+      clone.querySelectorAll('input').forEach((input) => {
+        if (input.name === 'tag_names[]') {
+          input.value = '';
+        }
+        if (input.name === 'tag_colors[]') {
+          input.value = defaultColor;
+        }
+      });
+      bindRemove(clone);
+      builder.appendChild(clone);
+      return clone;
+    };
+
+    bindRemove(template);
+
+    addButton.addEventListener('click', () => {
+      createRow();
+    });
+
+    const findRowByName = (normalized) => {
+      return Array.from(builder.querySelectorAll('.tag-row')).find((row) => {
+        const nameInput = row.querySelector("input[name='tag_names[]']");
+        return nameInput && nameInput.value.trim().toLowerCase() === normalized;
+      });
+    };
+
+    const findEmptyRow = () => {
+      return Array.from(builder.querySelectorAll('.tag-row')).find((row) => {
+        const nameInput = row.querySelector("input[name='tag_names[]']");
+        return nameInput && !nameInput.value.trim();
+      });
+    };
+
+    const presetButtons = document.querySelectorAll('.tag-preset');
+    presetButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const name = (button.dataset.tagName || '').trim();
+        if (!name) return;
+        const normalized = name.toLowerCase();
+        const color = button.dataset.tagColor || defaultColor;
+
+        let target = findRowByName(normalized);
+        if (!target) {
+          target = findEmptyRow() || createRow();
+        }
+
+        const nameInput = target.querySelector("input[name='tag_names[]']");
+        const colorInput = target.querySelector("input[name='tag_colors[]']");
+        if (nameInput) {
+          nameInput.value = name;
+        }
+        if (colorInput) {
+          colorInput.value = color;
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}

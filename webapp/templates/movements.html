@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="page-title mb-1">Movimentações</h1>
+    <p class="text-muted mb-0">Controle entradas e saídas com histórico completo e exportação.</p>
+  </div>
+  {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <a class="btn btn-soft-secondary btn-lg" href="{{ url_for('export_movements') }}">Exportar Excel</a>
+    <form
+      action="{{ url_for('import_movements') }}"
+      class="d-inline"
+      enctype="multipart/form-data"
+      id="movementsImportForm"
+      method="post"
+    >
+      <input
+        accept=".xlsx"
+        class="excel-import-input visually-hidden"
+        id="movementsImportInput"
+        name="file"
+        type="file"
+      >
+      <label class="btn btn-soft-primary btn-lg mb-0" for="movementsImportInput">Importar Excel</label>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card shadow-lg surface-card">
+      <div class="card-header border-0">
+        <h5 class="mb-0">Registrar movimentação</h5>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label" for="item_id">Item</label>
+            <select class="form-select" id="item_id" name="item_id" required>
+              <option value="" selected disabled>Selecione...</option>
+              {% for item in items_lookup.values() %}
+              <option value="{{ item.id }}">{{ item.name }} ({{ item.quantity }} un.)</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="quantity">Quantidade</label>
+              <input class="form-control" id="quantity" name="quantity" type="number" min="1" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="direction">Direção</label>
+              <select class="form-select" id="direction" name="direction">
+                <option value="entrada">Entrada</option>
+                <option value="saida">Saída</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="movement_type">Tipo</label>
+            <input class="form-control" id="movement_type" name="movement_type" placeholder="ex: compra, manutenção">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="notes">Observações</label>
+            <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+          </div>
+          <button class="btn btn-primary" type="submit">Registrar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card shadow-lg h-100 surface-card">
+      <div class="card-header border-0 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Histórico de movimentações</h5>
+        <div class="badge bg-secondary-subtle text-secondary">
+          {{ movements|length }} registro{{ 's' if movements|length != 1 else '' }}
+        </div>
+      </div>
+      <div class="card-body">
+        {% if movements %}
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Item</th>
+                <th>Quantidade</th>
+                <th>Responsável</th>
+                <th>Tipo</th>
+                <th>Observações</th>
+                <th class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for movement in movements|reverse %}
+              <tr>
+                <td>{{ movement.occurred_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ items_lookup[movement.item_id].name if movement.item_id in items_lookup else movement.item_id }}</td>
+                <td class="fw-semibold {{ 'text-success' if movement.quantity > 0 else 'text-danger' }}">{{ movement.quantity }}</td>
+                <td>{{ users[movement.responsible_id].name if movement.responsible_id in users else movement.responsible_id }}</td>
+                <td>{{ movement.movement_type|capitalize }}</td>
+                <td>{{ movement.notes or '—' }}</td>
+                <td class="text-end">
+                  {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
+                  <form
+                    action="{{ url_for('remove_movement', movement_id=movement.id) }}"
+                    class="d-inline"
+                    method="post"
+                    onsubmit="return confirm('Remover esta movimentação e reverter o estoque?');"
+                  >
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                  </form>
+                  {% else %}
+                  <span class="text-muted small">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Sem movimentações registradas.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
