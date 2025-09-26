@@ -60,6 +60,23 @@ Sistema de inventário de T.I construído como prova de conceito em Python.
 3. Acesse o navegador, escolha um dos usuários de demonstração e navegue pelas
    seções de dashboard, itens, categorias, movimentações e auditoria.
 
+### Solução de problemas comuns
+
+- **"Could not open requirements file"**: confirme que você está dentro da
+  pasta correta executando `Get-ChildItem requirements.txt` (PowerShell) ou
+  `ls requirements.txt` (Linux/macOS). Se o arquivo aparecer, rode o comando de
+  instalação novamente; caso contrário, navegue até a pasta que contém o
+  repositório extraído (por exemplo `cd TecnologiaIN-codex-create-ti-inventory-system-code`).
+- **`pip` ou `pytest` não reconhecidos**: utilize a forma modular do Python,
+  como `python -m pip install ...` e `python -m pytest`, que independem da
+  variável `PATH`.
+- **`flask` não reconhecido no PowerShell**: execute `python -m flask --app webapp.app run`
+  em vez de `flask ...`, ou use o script `scripts\run.ps1` que já faz esse
+  redirecionamento automaticamente.
+- **"Error: Could not import 'webapp.app'"**: verifique se as dependências
+  foram instaladas sem erros e se o comando está sendo executado na raiz do
+  projeto. Em seguida, tente novamente com `python -m flask --app webapp.app run`.
+
 ### Importar ou exportar registros em Excel
 
 - **Exportar**: em Itens, Categorias ou Movimentações clique em “Exportar
