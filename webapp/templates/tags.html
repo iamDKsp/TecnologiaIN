@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <h1 class="page-title mb-1">Gestão de Tags</h1>
+    <p class="text-muted mb-0">Crie, edite e organize etiquetas coloridas para aplicar rapidamente aos itens do inventário.</p>
+  </div>
+  {% if can_manage %}
+  <span class="badge rounded-pill text-bg-primary shadow-sm">{{ tags|length }} tag{% if tags|length != 1 %}s{% endif %}</span>
+  {% endif %}
+</div>
+
+{% if can_manage %}
+<div class="card shadow-sm border-0 tag-card mb-4">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Adicionar nova tag</h2>
+    <form class="row g-3 align-items-end" method="post">
+      <div class="col-md-6">
+        <label class="form-label" for="tagName">Nome</label>
+        <input class="form-control" id="tagName" name="name" placeholder="Ex.: Urgente" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="tagColor">Cor</label>
+        <input class="form-control-color w-100" id="tagColor" name="color" type="color" value="#14b8a6" title="Cor da tag">
+      </div>
+      <div class="col-md-3 text-md-end">
+        <button class="btn btn-primary px-4" type="submit">Cadastrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <h2 class="h5 mb-0">Tags cadastradas</h2>
+      {% if not can_manage %}
+      <span class="badge rounded-pill text-bg-primary shadow-sm">{{ tags|length }} tag{% if tags|length != 1 %}s{% endif %}</span>
+      {% endif %}
+    </div>
+    {% if tags %}
+    <div class="table-responsive mt-3">
+      <table class="table align-middle tags-table mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Visual</th>
+            <th scope="col">Nome</th>
+            <th scope="col">Cor</th>
+            {% if can_manage %}<th scope="col" class="text-end">Ações</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for tag in tags %}
+          <tr>
+            <td>
+              <span class="tag-preview" style="--tag-color: {{ tag.color }}" aria-hidden="true"></span>
+            </td>
+            <td class="fw-semibold">{{ tag.name }}</td>
+            <td><code>{{ tag.color }}</code></td>
+            {% if can_manage %}
+            <td class="text-end">
+              <div class="d-flex justify-content-end gap-2">
+                <form class="d-flex flex-wrap gap-2" method="post" action="{{ url_for('update_tag', tag_id=tag.id) }}">
+                  <input class="form-control form-control-sm" name="name" value="{{ tag.name }}" required>
+                  <input class="form-control-color" name="color" type="color" value="{{ tag.color }}" title="Cor">
+                  <button class="btn btn-sm btn-outline-primary" type="submit">Salvar</button>
+                </form>
+                <form method="post" action="{{ url_for('remove_tag', tag_id=tag.id) }}" onsubmit="return confirm('Deseja remover esta tag? As associações nos itens serão removidas.');">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Excluir</button>
+                </form>
+              </div>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted mt-3 mb-0">Nenhuma tag cadastrada ainda. Utilize o formulário acima para criar a primeira.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

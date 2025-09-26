@@ -38,6 +38,47 @@ def category(service: InventoryService):
     )
 
 
+def test_tag_definition_lifecycle_updates_items(service, manager, category):
+    urgent = service.create_tag_definition(name="Urgente", color="#ff0000")
+
+    item = service.create_item(
+        user=manager,
+        name="Notebook", 
+        description="Notebook de testes",
+        category_id=category.id,
+        quantity=1,
+        minimum_quantity=0,
+        serial_number="NB-001",
+        location="Lab",
+        acquisition_value=1000.0,
+        supplier="Fabricante",
+        purchase_date=datetime.utcnow(),
+        tags=[urgent],
+    )
+
+    updated = service.update_tag_definition(
+        tag_id=urgent.id,
+        name="Crítico",
+        color="#ff8800",
+    )
+
+    stored_item = service.get_item(item.id)
+    assert [(tag.name, tag.color) for tag in stored_item.tags] == [
+        (updated.name, updated.color)
+    ]
+
+    service.delete_tag_definition(tag_id=urgent.id)
+
+    assert service.get_item(item.id).tags == []
+
+
+def test_tag_definition_prevents_duplicate_names(service):
+    service.create_tag_definition(name="Backup", color="#22d3ee")
+
+    with pytest.raises(ValidationError):
+        service.create_tag_definition(name="backup")
+
+
 def test_update_category_metadata(service, manager, category):
     network = service.create_category(name="Rede", parent_id=category.id)
 
@@ -322,3 +363,24 @@ def test_create_item_with_string_tags_uses_default_color(service, manager, categ
     )
 
     assert item.tags[0].color == DEFAULT_TAG_COLOR
+
+
+def test_string_tags_use_predefined_color_when_available(service, manager, category):
+    definition = service.create_tag_definition(name="Suporte", color="#0ea5e9")
+
+    item = service.create_item(
+        user=manager,
+        name="Telefone VoIP",
+        description="Aparelho para a recepção",
+        category_id=category.id,
+        quantity=2,
+        minimum_quantity=1,
+        serial_number="VOIP-1",
+        location="Recepção",
+        acquisition_value=450.0,
+        supplier="Cisco",
+        purchase_date=datetime.utcnow(),
+        tags=["suporte"],
+    )
+
+    assert item.tags[0].color == definition.color

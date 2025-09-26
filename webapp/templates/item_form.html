@@ -85,6 +85,25 @@
       </div>
     </div>
     <button class="btn btn-sm btn-outline-primary" id="addTag" type="button">Adicionar tag</button>
+    {% if tag_definitions %}
+    <div class="tag-preset-collection mt-3" aria-label="Tags pré-definidas">
+      <p class="form-text mb-2">Selecione uma tag pré-definida para preencher automaticamente.</p>
+      <div class="d-flex flex-wrap gap-2">
+        {% for tag in tag_definitions %}
+        <button
+          class="btn tag-preset"
+          type="button"
+          data-tag-name="{{ tag.name }}"
+          data-tag-color="{{ tag.color }}"
+          style="--tag-color: {{ tag.color }}"
+        >
+          <span class="tag-preset-swatch" aria-hidden="true"></span>
+          <span>{{ tag.name }}</span>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
   <div class="col-12">
     <label class="form-label" for="attachments">Anexos (um por linha)</label>
@@ -132,12 +151,51 @@
       });
       bindRemove(clone);
       builder.appendChild(clone);
+      return clone;
     };
 
     bindRemove(template);
 
     addButton.addEventListener('click', () => {
       createRow();
+    });
+
+    const findRowByName = (normalized) => {
+      return Array.from(builder.querySelectorAll('.tag-row')).find((row) => {
+        const nameInput = row.querySelector("input[name='tag_names[]']");
+        return nameInput && nameInput.value.trim().toLowerCase() === normalized;
+      });
+    };
+
+    const findEmptyRow = () => {
+      return Array.from(builder.querySelectorAll('.tag-row')).find((row) => {
+        const nameInput = row.querySelector("input[name='tag_names[]']");
+        return nameInput && !nameInput.value.trim();
+      });
+    };
+
+    const presetButtons = document.querySelectorAll('.tag-preset');
+    presetButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const name = (button.dataset.tagName || '').trim();
+        if (!name) return;
+        const normalized = name.toLowerCase();
+        const color = button.dataset.tagColor || defaultColor;
+
+        let target = findRowByName(normalized);
+        if (!target) {
+          target = findEmptyRow() || createRow();
+        }
+
+        const nameInput = target.querySelector("input[name='tag_names[]']");
+        const colorInput = target.querySelector("input[name='tag_colors[]']");
+        if (nameInput) {
+          nameInput.value = name;
+        }
+        if (colorInput) {
+          colorInput.value = color;
+        }
+      });
     });
   })();
 </script>

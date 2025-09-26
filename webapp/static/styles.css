@@ -640,6 +640,93 @@ body[data-theme="dark"] .tag-builder .tag-row {
   white-space: nowrap;
 }
 
+.tag-preset-collection {
+  background: rgba(91, 60, 196, 0.08);
+  border: 1px dashed rgba(91, 60, 196, 0.2);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+body[data-theme="dark"] .tag-preset-collection {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.tag-preset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(91, 60, 196, 0.25);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-text);
+  font-weight: 600;
+  padding: 0.4rem 0.95rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tag-preset:hover,
+.tag-preset:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 20px rgba(25, 33, 63, 0.15);
+}
+
+.tag-preset-swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--tag-color, var(--color-primary));
+  box-shadow: 0 0 0 3px rgba(91, 60, 196, 0.15);
+}
+
+body[data-theme="dark"] .tag-preset {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: var(--color-text);
+}
+
+body[data-theme="dark"] .tag-preset-swatch {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+.tag-card {
+  background: linear-gradient(135deg, rgba(91, 60, 196, 0.12), rgba(30, 157, 247, 0.08));
+}
+
+body[data-theme="dark"] .tag-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(34, 211, 238, 0.08));
+}
+
+.tags-table thead th {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tags-table td,
+.tags-table th {
+  border-color: rgba(91, 60, 196, 0.12);
+}
+
+body[data-theme="dark"] .tags-table td,
+body[data-theme="dark"] .tags-table th {
+  border-color: rgba(99, 102, 241, 0.22);
+}
+
+.tag-preview {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--tag-color, var(--color-primary));
+  box-shadow: 0 6px 16px rgba(25, 33, 63, 0.2);
+}
+
+body[data-theme="dark"] .tag-preview {
+  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.55);
+}
+
 .color-swatch {
   width: 1.25rem;
   height: 1.25rem;

@@ -40,9 +40,8 @@
             <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
             <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}">Itens</a></li>
             <li class="nav-item"><a class="nav-link" href="{{ url_for('categories') }}">Categorias</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('tags') }}">Tags</a></li>
             <li class="nav-item"><a class="nav-link" href="{{ url_for('movements') }}">Movimentações</a></li>
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('notifications') }}">Alertas</a></li>
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('audit') }}">Auditoria</a></li>
             {% endif %}
           </ul>
             <div class="d-flex align-items-center gap-3 nav-actions">
@@ -96,9 +95,13 @@
           </button>
         </div>
         {% if current_user %}
+        <a class="sidebar-link" href="{{ url_for('notifications') }}" data-sidebar-close>
+          <span class="sidebar-icon" aria-hidden="true">🔔</span>
+          <span>Alertas</span>
+        </a>
         <a class="sidebar-link" href="{{ url_for('audit') }}" data-sidebar-close>
           <span class="sidebar-icon" aria-hidden="true">🗂️</span>
-          <span>Logs</span>
+          <span>Auditoria</span>
         </a>
         <a class="sidebar-link sidebar-logout" href="{{ url_for('logout') }}" data-sidebar-close>
           <span class="sidebar-icon" aria-hidden="true">🚪</span>

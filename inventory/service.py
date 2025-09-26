@@ -24,6 +24,7 @@ from .models import (
     Role,
     ROLE_HIERARCHY,
     Tag,
+    TagDefinition,
     ScheduledReport,
     User,
     ValidationError,
@@ -34,7 +35,7 @@ HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 DEFAULT_CATEGORY_COLOR = "#6366f1"
 DEFAULT_TAG_COLOR = "#14b8a6"
 
-TagInput = Union[Tag, Tuple[str, str], Dict[str, str], str]
+TagInput = Union[Tag, TagDefinition, Tuple[str, str], Dict[str, str], str]
 UsageStatusInput = Union[ItemUsageStatus, str, None]
 
 _UNSET = object()
@@ -46,6 +47,7 @@ class InventoryService:
     def __init__(self) -> None:
         self._items: Dict[str, Item] = {}
         self._categories: Dict[str, Category] = {}
+        self._tag_definitions: Dict[str, TagDefinition] = {}
         self._users: Dict[str, User] = {}
         self._movements: Dict[str, Movement] = {}
         self._notifications: Dict[str, Notification] = {}
@@ -87,6 +89,18 @@ class InventoryService:
         self._notifications[notification.id] = notification
         return notification
 
+    def _find_tag_definition(self, reference: str) -> Optional[TagDefinition]:
+        if reference is None:
+            return None
+        key = str(reference).strip()
+        if not key:
+            return None
+        lower_key = key.lower()
+        for definition in self._tag_definitions.values():
+            if definition.id == key or definition.name.strip().lower() == lower_key:
+                return definition
+        return None
+
     def _coerce_usage_status(self, status: UsageStatusInput) -> ItemUsageStatus:
         if status is None:
             return ItemUsageStatus.AVAILABLE
@@ -126,12 +140,29 @@ class InventoryService:
             color = self._normalize_hex_color(raw.color, default=DEFAULT_TAG_COLOR)
             return Tag(name=name, color=color)
 
+        if isinstance(raw, TagDefinition):
+            name = raw.name.strip()
+            if not name:
+                raise ValidationError("Nome da tag é obrigatório")
+            color = self._normalize_hex_color(raw.color, default=DEFAULT_TAG_COLOR)
+            return Tag(name=name, color=color)
+
         if isinstance(raw, tuple) and len(raw) == 2:
             name, color = raw
+            matched = self._find_tag_definition(name)
+            if matched and (color is None or str(color).strip() == ""):
+                return Tag(name=matched.name, color=matched.color)
         elif isinstance(raw, dict):
             name = raw.get("name") or raw.get("label")
             color = raw.get("color")
+            if name:
+                matched = self._find_tag_definition(name)
+                if matched and (color is None or str(color).strip() == ""):
+                    return Tag(name=matched.name, color=matched.color)
         elif isinstance(raw, str):
+            matched = self._find_tag_definition(raw)
+            if matched:
+                return Tag(name=matched.name, color=matched.color)
             name = raw
             color = DEFAULT_TAG_COLOR
         else:  # pragma: no cover - defensive branch
@@ -301,6 +332,90 @@ class InventoryService:
             entity_id=category.id,
             payload={"name": category.name},
         )
+
+    # ------------------------------------------------------------------
+    # Tag definitions
+    # ------------------------------------------------------------------
+    def create_tag_definition(self, *, name: str, color: Optional[str] = None) -> TagDefinition:
+        normalized_name = (name or "").strip()
+        if not normalized_name:
+            raise ValidationError("Nome da tag é obrigatório")
+
+        existing = {
+            tag.name.strip().lower(): tag.id for tag in self._tag_definitions.values()
+        }
+        key = normalized_name.lower()
+        if key in existing:
+            raise ValidationError("Já existe uma tag com este nome")
+
+        normalized_color = self._normalize_hex_color(color, default=DEFAULT_TAG_COLOR)
+        definition = TagDefinition(id=str(uuid4()), name=normalized_name, color=normalized_color)
+        self._tag_definitions[definition.id] = definition
+        return definition
+
+    def list_tag_definitions(self) -> List[TagDefinition]:
+        return sorted(self._tag_definitions.values(), key=lambda tag: tag.name.lower())
+
+    def get_tag_definition(self, tag_id: str) -> TagDefinition:
+        try:
+            return self._tag_definitions[tag_id]
+        except KeyError as exc:  # pragma: no cover - defensive branch
+            raise NotFoundError("Tag não encontrada") from exc
+
+    def update_tag_definition(
+        self,
+        *,
+        tag_id: str,
+        name: Optional[str] = None,
+        color: Optional[str] = None,
+    ) -> TagDefinition:
+        definition = self.get_tag_definition(tag_id)
+
+        new_name = definition.name
+        if name is not None:
+            candidate = name.strip()
+            if not candidate:
+                raise ValidationError("Nome da tag é obrigatório")
+            lowered = candidate.lower()
+            if any(
+                other.id != tag_id and other.name.strip().lower() == lowered
+                for other in self._tag_definitions.values()
+            ):
+                raise ValidationError("Já existe uma tag com este nome")
+            new_name = candidate
+
+        new_color = definition.color
+        if color is not None:
+            new_color = self._normalize_hex_color(color, default=definition.color)
+
+        if new_name == definition.name and new_color == definition.color:
+            return definition
+
+        updated = replace(definition, name=new_name, color=new_color)
+        self._tag_definitions[tag_id] = updated
+
+        if new_name != definition.name or new_color != definition.color:
+            old_key = definition.name.strip().lower()
+            for item in self._items.values():
+                changed = False
+                for index, tag in enumerate(item.tags):
+                    if tag.name.strip().lower() == old_key:
+                        item.tags[index] = Tag(name=new_name, color=new_color)
+                        changed = True
+                if changed:
+                    item.updated_at = datetime.utcnow()
+
+        return updated
+
+    def delete_tag_definition(self, *, tag_id: str) -> None:
+        try:
+            definition = self._tag_definitions.pop(tag_id)
+        except KeyError as exc:  # pragma: no cover - defensive branch
+            raise NotFoundError("Tag não encontrada") from exc
+
+        for item in self._items.values():
+            if item.tags:
+                item.remove_tags(definition.name)
 
     # ------------------------------------------------------------------
     # Items

@@ -69,6 +69,15 @@ class Tag:
 
 
 @dataclass(slots=True)
+class TagDefinition:
+    """Predefined tag template available for associating with items."""
+
+    id: str
+    name: str
+    color: str
+
+
+@dataclass(slots=True)
 class Item:
     """Represents an inventory item."""
 

@@ -72,6 +72,11 @@ def create_app() -> Flask:
         color="#f97316",
     )
 
+    desenvolvimento = service.create_tag_definition(name="Desenvolvimento", color="#14b8a6")
+    prioritario = service.create_tag_definition(name="Prioritário", color="#f97316")
+    rede_tag = service.create_tag_definition(name="Rede", color="#22d3ee")
+    manutencao = service.create_tag_definition(name="Manutenção", color="#facc15")
+
     service.create_item(
         user=admin,
         name="Notebook Dell XPS",
@@ -84,7 +89,7 @@ def create_app() -> Flask:
         acquisition_value=8200.0,
         supplier="Dell",
         purchase_date=datetime.utcnow(),
-        tags=[("Desenvolvimento", "#14b8a6"), ("Prioritário", "#f97316")],
+        tags=[desenvolvimento, prioritario],
         usage_status=ItemUsageStatus.IN_USE,
     )
     service.create_item(
@@ -99,7 +104,7 @@ def create_app() -> Flask:
         acquisition_value=12500.0,
         supplier="Cisco",
         purchase_date=datetime.utcnow(),
-        tags=[("Rede", "#22d3ee")],
+        tags=[rede_tag, manutencao],
         usage_status=ItemUsageStatus.AVAILABLE,
     )
 
@@ -490,6 +495,70 @@ def register_routes(app: Flask) -> None:
             flash("Nenhuma categoria foi importada.", "info")
         return redirect(url_for("categories"))
 
+    @app.route("/tags", methods=["GET", "POST"])
+    def tags():
+        if not g.current_user:
+            return redirect(url_for("login"))
+
+        can_manage = _is_manager(g.current_user)
+        if request.method == "POST":
+            if not can_manage:
+                flash("Você não possui permissão para criar tags.", "danger")
+                return redirect(url_for("tags"))
+
+            name = request.form.get("name", "").strip()
+            color = request.form.get("color") or None
+            if not name:
+                flash("Informe um nome para a tag.", "warning")
+            else:
+                try:
+                    service.create_tag_definition(name=name, color=color)
+                except InventoryError as exc:
+                    flash(str(exc), "danger")
+                else:
+                    flash("Tag criada com sucesso!", "success")
+                    return redirect(url_for("tags"))
+
+        return render_template(
+            "tags.html",
+            tags=service.list_tag_definitions(),
+            can_manage=can_manage,
+        )
+
+    @app.post("/tags/<tag_id>/editar")
+    def update_tag(tag_id: str):
+        if not g.current_user:
+            return redirect(url_for("login"))
+        if not _is_manager(g.current_user):
+            flash("Você não possui permissão para editar tags.", "danger")
+            return redirect(url_for("tags"))
+
+        name = request.form.get("name")
+        color = request.form.get("color") or None
+        try:
+            service.update_tag_definition(tag_id=tag_id, name=name, color=color)
+        except InventoryError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Tag atualizada com sucesso!", "success")
+        return redirect(url_for("tags"))
+
+    @app.post("/tags/<tag_id>/remover")
+    def remove_tag(tag_id: str):
+        if not g.current_user:
+            return redirect(url_for("login"))
+        if not _is_manager(g.current_user):
+            flash("Você não possui permissão para remover tags.", "danger")
+            return redirect(url_for("tags"))
+
+        try:
+            service.delete_tag_definition(tag_id=tag_id)
+        except InventoryError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Tag removida com sucesso!", "success")
+        return redirect(url_for("tags"))
+
     @app.route("/itens")
     def items():
         if not g.current_user:
@@ -792,7 +861,11 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("login"))
 
         categories = service.list_categories()
-        template_ctx = {"categories": categories, "usage_statuses": list(ItemUsageStatus)}
+        template_ctx = {
+            "categories": categories,
+            "usage_statuses": list(ItemUsageStatus),
+            "tag_definitions": service.list_tag_definitions(),
+        }
         if request.method == "POST":
             form = request.form
             try:
@@ -808,6 +881,7 @@ def register_routes(app: Flask) -> None:
                 location = form.get("location", "").strip()
                 if not all([name, description, category_id, location]):
                     flash("Preencha todos os campos obrigatórios", "warning")
+                    template_ctx["tag_definitions"] = service.list_tag_definitions()
                     return render_template("item_form.html", **template_ctx)
                 purchase_date = form.get("purchase_date")
                 parsed_date: Optional[datetime] = None
@@ -816,6 +890,7 @@ def register_routes(app: Flask) -> None:
                         parsed_date = datetime.strptime(purchase_date, "%Y-%m-%d")
                     except ValueError:
                         flash("Data de compra inválida", "danger")
+                        template_ctx["tag_definitions"] = service.list_tag_definitions()
                         return render_template("item_form.html", **template_ctx)
                 tag_names = form.getlist("tag_names[]")
                 tag_colors = form.getlist("tag_colors[]")
@@ -845,6 +920,7 @@ def register_routes(app: Flask) -> None:
                     )
                 except InventoryError as exc:
                     flash(str(exc), "danger")
+                    template_ctx["tag_definitions"] = service.list_tag_definitions()
                 else:
                     flash("Item cadastrado com sucesso!", "success")
                     return redirect(url_for("items"))
