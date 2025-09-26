@@ -3,8 +3,8 @@
 {% block content %}
 <div class="row g-4">
   <div class="col-lg-5">
-    <div class="card shadow-sm">
-      <div class="card-header bg-white">
+    <div class="card shadow-lg surface-card">
+      <div class="card-header border-0">
         <h5 class="mb-0">Registrar movimentação</h5>
       </div>
       <div class="card-body">
@@ -45,9 +45,12 @@
     </div>
   </div>
   <div class="col-lg-7">
-    <div class="card shadow-sm h-100">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <div class="card shadow-lg h-100 surface-card">
+      <div class="card-header border-0 d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Histórico de movimentações</h5>
+        <div class="badge bg-secondary-subtle text-secondary">
+          {{ movements|length }} registro{{ 's' if movements|length != 1 else '' }}
+        </div>
       </div>
       <div class="card-body">
         {% if movements %}
@@ -61,6 +64,7 @@
                 <th>Responsável</th>
                 <th>Tipo</th>
                 <th>Observações</th>
+                <th class="text-end">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -72,6 +76,20 @@
                 <td>{{ users[movement.responsible_id].name if movement.responsible_id in users else movement.responsible_id }}</td>
                 <td>{{ movement.movement_type|capitalize }}</td>
                 <td>{{ movement.notes or '—' }}</td>
+                <td class="text-end">
+                  {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
+                  <form
+                    action="{{ url_for('remove_movement', movement_id=movement.id) }}"
+                    class="d-inline"
+                    method="post"
+                    onsubmit="return confirm('Remover esta movimentação e reverter o estoque?');"
+                  >
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                  </form>
+                  {% else %}
+                  <span class="text-muted small">—</span>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>

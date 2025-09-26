@@ -3,8 +3,8 @@
 {% block content %}
 <div class="row g-4">
   <div class="col-lg-5">
-    <div class="card shadow-sm">
-      <div class="card-header bg-white">
+    <div class="card shadow-lg surface-card">
+      <div class="card-header border-0">
         <h5 class="mb-0">Nova categoria</h5>
       </div>
       <div class="card-body">
@@ -32,21 +32,33 @@
     </div>
   </div>
   <div class="col-lg-7">
-    <div class="card shadow-sm h-100">
-      <div class="card-header bg-white">
+    <div class="card shadow-lg h-100 surface-card">
+      <div class="card-header border-0 d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Categorias cadastradas</h5>
+        <span class="badge rounded-pill bg-accent">{{ categories|length }}</span>
       </div>
       <div class="card-body">
         {% if categories %}
         <ul class="list-group list-group-flush">
           {% for category in categories %}
-          <li class="list-group-item">
-            <div class="fw-semibold">{{ category.name }}</div>
-            {% if category.description %}
-            <small class="text-muted">{{ category.description }}</small>
-            {% endif %}
-            {% if category.parent_id %}
-            <div><span class="badge bg-light text-dark">Subcategoria</span></div>
+          <li class="list-group-item d-flex justify-content-between align-items-start gap-3">
+            <div>
+              <div class="fw-semibold">{{ category.name }}</div>
+              {% if category.description %}
+              <small class="text-muted d-block">{{ category.description }}</small>
+              {% endif %}
+              {% if category.parent_id %}
+              <span class="badge bg-light text-dark mt-2">Subcategoria</span>
+              {% endif %}
+            </div>
+            {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
+            <form
+              action="{{ url_for('remove_category', category_id=category.id) }}"
+              method="post"
+              onsubmit="return confirm('Remover a categoria {{ category.name }}?');"
+            >
+              <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+            </form>
             {% endif %}
           </li>
           {% endfor %}

@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1 class="mb-4">Painel de Controle</h1>
+<h1 class="page-title display-5 fw-bold text-gradient mb-4">Painel de Controle</h1>
 <div class="row g-3 mb-4">
   <div class="col-md-3">
-    <div class="card border-0 shadow-sm h-100">
+    <div class="card surface-card shadow-lg h-100">
       <div class="card-body">
         <h6 class="text-muted text-uppercase">Itens cadastrados</h6>
         <p class="display-6 fw-bold">{{ items|length }}</p>
@@ -12,7 +12,7 @@
     </div>
   </div>
   <div class="col-md-3">
-    <div class="card border-0 shadow-sm h-100">
+    <div class="card surface-card shadow-lg h-100">
       <div class="card-body">
         <h6 class="text-muted text-uppercase">Categorias</h6>
         <p class="display-6 fw-bold">{{ categories|length }}</p>
@@ -20,7 +20,7 @@
     </div>
   </div>
   <div class="col-md-3">
-    <div class="card border-0 shadow-sm h-100">
+    <div class="card surface-card shadow-lg h-100">
       <div class="card-body">
         <h6 class="text-muted text-uppercase">Alertas ativos</h6>
         <p class="display-6 fw-bold">{{ notifications|length }}</p>
@@ -28,7 +28,7 @@
     </div>
   </div>
   <div class="col-md-3">
-    <div class="card border-0 shadow-sm h-100">
+    <div class="card surface-card shadow-lg h-100">
       <div class="card-body">
         <h6 class="text-muted text-uppercase">Itens em atenção</h6>
         <p class="display-6 fw-bold text-warning">{{ low_stock|length }}</p>
@@ -39,8 +39,8 @@
 
 <div class="row g-4">
   <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-header bg-white">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0">
         <h5 class="card-title mb-0">Itens com estoque crítico</h5>
       </div>
       <div class="card-body">
@@ -60,8 +60,8 @@
     </div>
   </div>
   <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-header bg-white">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0">
         <h5 class="card-title mb-0">Últimas notificações</h5>
       </div>
       <div class="card-body">
@@ -87,8 +87,8 @@
 
 <div class="row g-4 mt-1">
   <div class="col-12">
-    <div class="card shadow-sm">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <div class="card shadow-lg surface-card">
+      <div class="card-header border-0 d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Movimentações recentes</h5>
         <a class="btn btn-sm btn-outline-primary" href="{{ url_for('movements') }}">Ver todas</a>
       </div>

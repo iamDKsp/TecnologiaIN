@@ -1,9 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h1 class="mb-0">Itens de Inventário</h1>
-  <a class="btn btn-primary" href="{{ url_for('new_item') }}">Novo item</a>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="page-title mb-1">Itens de Inventário</h1>
+    <p class="text-muted mb-0">Acompanhe todos os ativos cadastrados e mantenha o estoque em ordem.</p>
+  </div>
+  {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
+  <a class="btn btn-primary btn-lg" href="{{ url_for('new_item') }}">Novo item</a>
+  {% endif %}
 </div>
 
 <form class="row g-3 mb-4" method="get">
@@ -29,6 +34,7 @@
         <th>Localização</th>
         <th>Fornecedor</th>
         <th>Tags</th>
+        <th class="text-end">Ações</th>
       </tr>
     </thead>
     <tbody>
@@ -52,10 +58,25 @@
           <span class="text-muted">—</span>
           {% endif %}
         </td>
+        <td class="text-end">
+          {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
+          <form
+            action="{{ url_for('remove_item', item_id=item.id) }}"
+            class="d-inline"
+            method="post"
+            onsubmit="return confirm('Remover o item {{ item.name }} do inventário?');"
+          >
+            <input name="categoria" type="hidden" value="{{ selected_category or '' }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+          </form>
+          {% else %}
+          <span class="text-muted small">—</span>
+          {% endif %}
+        </td>
       </tr>
       {% else %}
       <tr>
-        <td colspan="7" class="text-center text-muted">Nenhum item encontrado.</td>
+        <td colspan="8" class="text-center text-muted">Nenhum item encontrado.</td>
       </tr>
       {% endfor %}
     </tbody>

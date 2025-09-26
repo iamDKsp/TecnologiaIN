@@ -16,7 +16,7 @@ from flask import (
     url_for,
 )
 
-from inventory.models import InventoryError, Role, ValidationError
+from inventory.models import InventoryError, ROLE_HIERARCHY, Role, ValidationError
 from inventory.service import InventoryService
 
 
@@ -28,19 +28,19 @@ def create_app() -> Flask:
 
     service = InventoryService()
     admin = service.register_user(
-        name="Administrador",
-        email="admin@tecnologiain",
+        name="Tarcisio Pereira",
+        email="tarcisio.pereira@tecnologiain",
         role=Role.ADMIN,
         mfa_enabled=True,
     )
     manager = service.register_user(
-        name="Gestor de TI",
-        email="gestor@tecnologiain",
+        name="Rafael Bomfim",
+        email="rafael.bomfim@tecnologiain",
         role=Role.MANAGER,
     )
     operator = service.register_user(
-        name="Operador",
-        email="operador@tecnologiain",
+        name="Raphael Acosta",
+        email="raphael.acosta@tecnologiain",
         role=Role.OPERATOR,
     )
 
@@ -111,7 +111,11 @@ def register_routes(app: Flask) -> None:
 
     @app.context_processor
     def context() -> dict[str, object]:
-        return {"current_user": g.get("current_user")}
+        return {
+            "current_user": g.get("current_user"),
+            "Role": Role,
+            "role_hierarchy": ROLE_HIERARCHY,
+        }
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -180,6 +184,19 @@ def register_routes(app: Flask) -> None:
 
         categories = service.list_categories()
         return render_template("categories.html", categories=categories)
+
+    @app.post("/categorias/<category_id>/remover")
+    def remove_category(category_id: str):
+        if not g.current_user:
+            return redirect(url_for("login"))
+
+        try:
+            service.delete_category(user=g.current_user, category_id=category_id)
+        except InventoryError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Categoria removida com sucesso!", "success")
+        return redirect(url_for("categories"))
 
     @app.route("/itens")
     def items():
@@ -253,6 +270,24 @@ def register_routes(app: Flask) -> None:
 
         return render_template("item_form.html", categories=categories)
 
+    @app.post("/itens/<item_id>/remover")
+    def remove_item(item_id: str):
+        if not g.current_user:
+            return redirect(url_for("login"))
+
+        selected_category = request.form.get("categoria") or None
+
+        try:
+            service.delete_item(user=g.current_user, item_id=item_id)
+        except InventoryError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Item removido com sucesso!", "success")
+
+        if selected_category:
+            return redirect(url_for("items", categoria=selected_category))
+        return redirect(url_for("items"))
+
     @app.route("/movimentacoes", methods=["GET", "POST"])
     def movements():
         if not g.current_user:
@@ -292,6 +327,19 @@ def register_routes(app: Flask) -> None:
             items_lookup=items_lookup,
             users=users,
         )
+
+    @app.post("/movimentacoes/<movement_id>/remover")
+    def remove_movement(movement_id: str):
+        if not g.current_user:
+            return redirect(url_for("login"))
+
+        try:
+            service.delete_movement(user=g.current_user, movement_id=movement_id)
+        except InventoryError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Movimentação removida com sucesso!", "success")
+        return redirect(url_for("movements"))
 
     @app.route("/alertas")
     def notifications():

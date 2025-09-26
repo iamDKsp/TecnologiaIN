@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from inventory.models import Role, ValidationError
+from inventory.models import NotFoundError, Role, ValidationError
 from inventory.service import InventoryService
 
 
@@ -163,3 +163,79 @@ def test_list_and_get_users(service):
     fetched = service.get_user(users[0].id)
 
     assert fetched.email == "admin@example.com"
+
+
+def test_delete_item_and_audit(service, manager, category):
+    item = service.create_item(
+        user=manager,
+        name="Monitor",
+        description="Monitor 27 pol.",
+        category_id=category.id,
+        quantity=3,
+        minimum_quantity=1,
+        serial_number="MNTR-123",
+        location="Suporte",
+        acquisition_value=1500.0,
+        supplier="LG",
+        purchase_date=datetime.utcnow(),
+    )
+
+    service.delete_item(user=manager, item_id=item.id)
+
+    with pytest.raises(NotFoundError):
+        service.get_item(item.id)
+
+
+def test_delete_category_without_dependencies(service, manager):
+    orphan = service.create_category(name="Descartados")
+
+    service.delete_category(user=manager, category_id=orphan.id)
+
+    assert orphan.id not in {cat.id for cat in service.list_categories()}
+
+
+def test_delete_category_with_items_fails(service, manager, category):
+    service.create_item(
+        user=manager,
+        name="Hub USB",
+        description="Hub 7 portas",
+        category_id=category.id,
+        quantity=2,
+        minimum_quantity=1,
+        serial_number="HUB-001",
+        location="Estoque",
+        acquisition_value=200.0,
+        supplier="Kingston",
+        purchase_date=datetime.utcnow(),
+    )
+
+    with pytest.raises(ValidationError):
+        service.delete_category(user=manager, category_id=category.id)
+
+
+def test_delete_movement_reverts_stock(service, manager, operator, category):
+    item = service.create_item(
+        user=manager,
+        name="Projetor",
+        description="Projetor sala reuniões",
+        category_id=category.id,
+        quantity=5,
+        minimum_quantity=1,
+        serial_number="PRJ-01",
+        location="Sala 2",
+        acquisition_value=2500.0,
+        supplier="Epson",
+        purchase_date=datetime.utcnow(),
+    )
+
+    movement = service.register_movement(
+        user=operator,
+        item_id=item.id,
+        quantity=-2,
+        movement_type="emprestimo",
+    )
+
+    service.delete_movement(user=manager, movement_id=movement.id)
+
+    updated = service.get_item(item.id)
+    assert updated.quantity == 5

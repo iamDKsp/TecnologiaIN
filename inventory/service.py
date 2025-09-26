@@ -141,6 +141,26 @@ class InventoryService:
 
         return self._get_category_or_raise(category_id)
 
+    def delete_category(self, *, user: User, category_id: str) -> None:
+        """Remove a category when it has no dependencies."""
+
+        self._require_role(user, Role.MANAGER)
+        category = self._get_category_or_raise(category_id)
+
+        if any(cat.parent_id == category_id for cat in self._categories.values()):
+            raise ValidationError("Não é possível remover uma categoria com subcategorias associadas")
+        if any(item.category_id == category_id for item in self._items.values()):
+            raise ValidationError("Não é possível remover uma categoria com itens associados")
+
+        del self._categories[category_id]
+        self._append_audit(
+            user=user,
+            action="remover_categoria",
+            entity="category",
+            entity_id=category.id,
+            payload={"name": category.name},
+        )
+
     # ------------------------------------------------------------------
     # Items
     # ------------------------------------------------------------------
@@ -260,6 +280,21 @@ class InventoryService:
 
         return self._get_item_or_raise(item_id)
 
+    def delete_item(self, *, user: User, item_id: str) -> None:
+        """Remove an item from the catalog."""
+
+        self._require_role(user, Role.MANAGER)
+        item = self._get_item_or_raise(item_id)
+
+        del self._items[item_id]
+        self._append_audit(
+            user=user,
+            action="remover_item",
+            entity="item",
+            entity_id=item.id,
+            payload={"name": item.name},
+        )
+
     # ------------------------------------------------------------------
     # Movements
     # ------------------------------------------------------------------
@@ -329,6 +364,33 @@ class InventoryService:
             movements = [m for m in movements if m.occurred_at <= end]
         movements.sort(key=lambda m: m.occurred_at)
         return movements
+
+    def delete_movement(self, *, user: User, movement_id: str) -> None:
+        """Remove a movement and revert its stock impact."""
+
+        self._require_role(user, Role.MANAGER)
+        movement = self._movements.get(movement_id)
+        if not movement:
+            raise NotFoundError("Movimentação não encontrada")
+
+        item = self._get_item_or_raise(movement.item_id)
+        reverted_quantity = item.quantity - movement.quantity
+        if reverted_quantity < 0:
+            raise ValidationError(
+                "Não é possível remover a movimentação pois resultaria em estoque negativo"
+            )
+
+        updated_item = replace(item, quantity=reverted_quantity, updated_at=datetime.utcnow())
+        self._items[item.id] = updated_item
+        del self._movements[movement_id]
+
+        self._append_audit(
+            user=user,
+            action="remover_movimentacao",
+            entity="movement",
+            entity_id=movement.id,
+            payload={"item_id": movement.item_id, "quantity": movement.quantity},
+        )
 
     # ------------------------------------------------------------------
     # Notifications & alerts
