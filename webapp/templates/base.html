@@ -21,7 +21,16 @@
   <body data-theme="light">
     <nav class="navbar navbar-expand-lg navbar-dark navbar-gradient shadow-sm">
       <div class="container-fluid">
-        <a class="navbar-brand fw-semibold" href="{{ url_for('dashboard') if current_user else url_for('login') }}">Inventory Tecfag</a>
+        <button
+          class="navbar-brand fw-semibold brand-trigger"
+          type="button"
+          id="sidebarToggle"
+          aria-controls="appSidebar"
+          aria-expanded="false"
+        >
+          <span class="brand-label">Inventory Tecfag</span>
+          <span class="brand-glow" aria-hidden="true"></span>
+        </button>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
           <span class="navbar-toggler-icon"></span>
         </button>
@@ -36,27 +45,74 @@
             <li class="nav-item"><a class="nav-link" href="{{ url_for('audit') }}">Auditoria</a></li>
             {% endif %}
           </ul>
-          <div class="d-flex align-items-center gap-3 nav-actions">
-            <button
-              class="btn btn-outline-light btn-sm theme-toggle d-flex align-items-center gap-2"
-              id="themeToggle"
-              type="button"
-            >
-              <span class="theme-icon" aria-hidden="true">🌙</span>
-              <span class="theme-text d-none d-md-inline">Modo escuro</span>
-            </button>
-            {% if current_user %}
-            <div class="d-flex align-items-center gap-3 text-white small fw-semibold">
-              <span>{{ current_user.name }} ({{ current_user.role.value|capitalize }})</span>
-              <a class="btn btn-light btn-sm px-3 fw-semibold" href="{{ url_for('logout') }}">Sair</a>
+            <div class="d-flex align-items-center gap-3 nav-actions">
+              {% if current_user %}
+              <div class="d-flex align-items-center gap-3 text-white small fw-semibold">
+                <span>{{ current_user.name }} ({{ current_user.role.value|capitalize }})</span>
+                <a class="btn btn-light btn-sm px-3 fw-semibold" href="{{ url_for('logout') }}">Sair</a>
+              </div>
+              {% else %}
+              <a class="btn btn-light btn-sm px-3 fw-semibold" href="{{ url_for('login') }}">Entrar</a>
+              {% endif %}
             </div>
-            {% else %}
-            <a class="btn btn-light btn-sm px-3 fw-semibold" href="{{ url_for('login') }}">Entrar</a>
-            {% endif %}
-          </div>
         </div>
       </div>
     </nav>
+
+    <aside class="app-sidebar" id="appSidebar" aria-hidden="true">
+      <div class="sidebar-header d-flex align-items-center justify-content-between">
+        <div class="sidebar-brand">
+          <span class="sidebar-title">Inventory Tecfag</span>
+          <span class="sidebar-subtitle">Menu principal</span>
+        </div>
+        <button class="sidebar-close" type="button" id="sidebarClose" aria-label="Fechar menu">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a
+          class="sidebar-link"
+          href="{{ url_for('dashboard') if current_user else url_for('login') }}"
+          data-sidebar-close
+        >
+          <span class="sidebar-icon" aria-hidden="true">🏠</span>
+          <span>Início</span>
+        </a>
+        <button
+          class="sidebar-link sidebar-collapser"
+          type="button"
+          data-sidebar-collapser="#sidebarConfig"
+          aria-expanded="false"
+        >
+          <span class="sidebar-icon" aria-hidden="true">⚙️</span>
+          <span>Configurações</span>
+          <span class="sidebar-caret" aria-hidden="true"></span>
+        </button>
+        <div class="sidebar-submenu" id="sidebarConfig" hidden>
+          <p class="sidebar-subtitle">Aparência</p>
+          <button class="sidebar-link theme-toggle" id="themeToggle" type="button">
+            <span class="theme-icon" aria-hidden="true">🌙</span>
+            <span class="theme-text">Modo escuro</span>
+          </button>
+        </div>
+        {% if current_user %}
+        <a class="sidebar-link" href="{{ url_for('audit') }}" data-sidebar-close>
+          <span class="sidebar-icon" aria-hidden="true">🗂️</span>
+          <span>Logs</span>
+        </a>
+        <a class="sidebar-link sidebar-logout" href="{{ url_for('logout') }}" data-sidebar-close>
+          <span class="sidebar-icon" aria-hidden="true">🚪</span>
+          <span>Sair</span>
+        </a>
+        {% else %}
+        <a class="sidebar-link sidebar-logout" href="{{ url_for('login') }}" data-sidebar-close>
+          <span class="sidebar-icon" aria-hidden="true">🔐</span>
+          <span>Entrar</span>
+        </a>
+        {% endif %}
+      </nav>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay" hidden></div>
 
     <main class="app-shell container-xxl py-5">
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -123,6 +179,93 @@
             applyTheme(next);
           });
         }
+
+        const sidebar = document.getElementById('appSidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarClose = document.getElementById('sidebarClose');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        const updateSidebarState = (open) => {
+          if (!sidebar) {
+            return;
+          }
+          sidebar.setAttribute('aria-hidden', open ? 'false' : 'true');
+          if (sidebarToggle) {
+            sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          }
+          if (open) {
+            document.body.classList.add('sidebar-open');
+            if (sidebarOverlay) {
+              sidebarOverlay.hidden = false;
+              requestAnimationFrame(() => {
+                sidebarOverlay.classList.add('visible');
+              });
+            }
+          } else {
+            document.body.classList.remove('sidebar-open');
+            if (sidebarOverlay) {
+              sidebarOverlay.classList.remove('visible');
+              sidebarOverlay.addEventListener(
+                'transitionend',
+                () => {
+                  if (!document.body.classList.contains('sidebar-open')) {
+                    sidebarOverlay.hidden = true;
+                  }
+                },
+                { once: true }
+              );
+            }
+          }
+        };
+
+        if (sidebarToggle) {
+          sidebarToggle.addEventListener('click', () => {
+            const willOpen = !document.body.classList.contains('sidebar-open');
+            updateSidebarState(willOpen);
+            if (willOpen) {
+              const firstFocusable = sidebar?.querySelector('a, button');
+              if (firstFocusable) {
+                firstFocusable.focus();
+              }
+            }
+          });
+        }
+
+        if (sidebarClose) {
+          sidebarClose.addEventListener('click', () => updateSidebarState(false));
+        }
+
+        if (sidebarOverlay) {
+          sidebarOverlay.addEventListener('click', () => updateSidebarState(false));
+        }
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && document.body.classList.contains('sidebar-open')) {
+            updateSidebarState(false);
+          }
+        });
+
+        sidebar?.querySelectorAll('[data-sidebar-close]').forEach((element) => {
+          element.addEventListener('click', () => updateSidebarState(false));
+        });
+
+        sidebar?.querySelectorAll('[data-sidebar-collapser]').forEach((trigger) => {
+          const targetSelector = trigger.getAttribute('data-sidebar-collapser');
+          const target = targetSelector ? document.querySelector(targetSelector) : null;
+          trigger.addEventListener('click', () => {
+            if (!target) {
+              return;
+            }
+            const expanded = trigger.getAttribute('aria-expanded') === 'true';
+            trigger.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+            trigger.classList.toggle('is-open', !expanded);
+            if (expanded) {
+              target.hidden = true;
+            } else {
+              target.hidden = false;
+            }
+          });
+        });
 
         document.querySelectorAll('.excel-import-input').forEach((input) => {
           input.addEventListener('change', () => {
