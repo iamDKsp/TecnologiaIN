@@ -32,7 +32,7 @@
     <label class="form-label" for="usage_status">Status de uso</label>
     <select class="form-select" id="usage_status" name="usage_status">
       {% for status in usage_statuses %}
-      <option value="{{ status.value }}" {% if status is ItemUsageStatus.AVAILABLE %}selected{% endif %}>
+      <option value="{{ status.value }}" {% if status == ItemUsageStatus.AVAILABLE %}selected{% endif %}>
         {{ status.label.upper() }}
       </option>
       {% endfor %}

@@ -9,19 +9,36 @@
   {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
   <div class="d-flex align-items-center gap-2 flex-wrap">
     <button
-      class="btn btn-outline-secondary btn-lg btn-icon"
+      aria-label="Recarregar lista"
+      class="btn btn-refresh btn-icon"
       id="refreshItems"
       title="Recarregar lista"
       type="button"
     >
-      ⟳
+      <span aria-hidden="true" class="refresh-icon">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M20.49 13.54a8.5 8.5 0 1 1-2.03-7.8l.07.09 1.05-1.05a.75.75 0 1 1 1.06 1.06l-2.33 2.33a.75.75 0 0 1-1.28-.53V4.75a.75.75 0 0 1 1.5 0v1.31A10 10 0 1 0 22 12a.75.75 0 0 1-1.5 0c0-.08 0-.16 0-.24l-.01-.22Z"
+            fill="currentColor"
+          />
+        </svg>
+      </span>
     </button>
     <button
-      class="btn btn-outline-primary btn-lg"
+      class="btn btn-outline-primary btn-lg d-inline-flex align-items-center gap-2"
+      data-action="open-movement-modal"
       data-bs-target="#movementModal"
       data-bs-toggle="modal"
       type="button"
     >
+      <span aria-hidden="true" class="icon-stack">
+        <svg fill="none" height="18" viewBox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M4.75 7A2.75 2.75 0 0 1 7.5 4.25h9A2.75 2.75 0 0 1 19.25 7v10A2.75 2.75 0 0 1 16.5 19.75h-9A2.75 2.75 0 0 1 4.75 17Zm2.75-1.5a1.25 1.25 0 0 0-1.25 1.25v10a1.25 1.25 0 0 0 1.25 1.25h9a1.25 1.25 0 0 0 1.25-1.25V6.75A1.25 1.25 0 0 0 16.5 5.5Zm1.5 10a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 0 1.5Zm0-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 0 1.5Zm0-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 0 1.5Z"
+            fill="currentColor"
+          />
+        </svg>
+      </span>
       Ajustar estoque
     </button>
     <a class="btn btn-primary btn-lg" href="{{ url_for('new_item') }}">Novo item</a>
@@ -157,9 +174,56 @@
   (function () {
     const refreshButton = document.getElementById('refreshItems');
     if (refreshButton) {
+      const icon = refreshButton.querySelector('.refresh-icon');
       refreshButton.addEventListener('click', () => {
-        window.location.reload();
+        refreshButton.classList.add('is-active');
+        refreshButton.setAttribute('aria-busy', 'true');
+        if (icon) {
+          icon.classList.add('spinning');
+        }
+        window.setTimeout(() => {
+          window.location.reload();
+        }, 220);
       });
+    }
+
+    const movementTriggers = document.querySelectorAll('[data-action="open-movement-modal"]');
+    const movementModalEl = document.getElementById('movementModal');
+    if (movementTriggers.length && movementModalEl) {
+      const showModal = () => {
+        if (window.bootstrap && typeof window.bootstrap.Modal === 'function') {
+          const modalInstance = window.bootstrap.Modal.getOrCreateInstance(movementModalEl);
+          modalInstance.show();
+        } else {
+          movementModalEl.classList.add('show');
+          movementModalEl.style.display = 'block';
+          movementModalEl.removeAttribute('aria-hidden');
+          document.body.classList.add('modal-open');
+        }
+      };
+
+      movementTriggers.forEach((trigger) => {
+        trigger.addEventListener('click', showModal);
+      });
+
+      movementModalEl.addEventListener('hidden.bs.modal', () => {
+        const form = movementModalEl.querySelector('form');
+        if (form) {
+          form.reset();
+        }
+      });
+
+      if (!window.bootstrap || typeof window.bootstrap.Modal !== 'function') {
+        const teardown = () => {
+          movementModalEl.classList.remove('show');
+          movementModalEl.style.display = 'none';
+          movementModalEl.setAttribute('aria-hidden', 'true');
+          document.body.classList.remove('modal-open');
+        };
+        movementModalEl.querySelectorAll('[data-bs-dismiss="modal"]').forEach((btn) => {
+          btn.addEventListener('click', teardown);
+        });
+      }
     }
   })();
 </script>

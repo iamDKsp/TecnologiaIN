@@ -388,6 +388,101 @@ body[data-theme="dark"] .color-swatch {
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
 }
 
+.btn-refresh {
+  background: rgba(91, 60, 196, 0.1);
+  border: 1px solid rgba(91, 60, 196, 0.35);
+  color: var(--color-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-refresh::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(91, 60, 196, 0.22), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.btn-refresh:hover::after,
+.btn-refresh.is-active::after {
+  opacity: 1;
+}
+
+.btn-refresh .refresh-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: rgba(91, 60, 196, 0.1);
+  box-shadow: 0 6px 14px rgba(25, 33, 63, 0.18);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.btn-refresh .refresh-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.btn-refresh:hover .refresh-icon {
+  transform: scale(1.06) translateY(-1px);
+  box-shadow: 0 10px 22px rgba(25, 33, 63, 0.25);
+}
+
+.btn-refresh .refresh-icon.spinning {
+  animation: refresh-spin 0.6s ease-in-out;
+}
+
+@keyframes refresh-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(0.9);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+body[data-theme="dark"] .btn-refresh {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.45);
+  color: var(--color-secondary);
+}
+
+body[data-theme="dark"] .btn-refresh .refresh-icon {
+  background: rgba(37, 99, 235, 0.25);
+  box-shadow: 0 10px 26px rgba(2, 6, 23, 0.65);
+}
+
+.icon-stack {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(91, 60, 196, 0.28);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.btn-outline-primary:hover .icon-stack,
+.btn-outline-primary:focus-visible .icon-stack {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 18px 30px rgba(91, 60, 196, 0.35);
+}
+
+body[data-theme="dark"] .icon-stack {
+  background: linear-gradient(135deg, #312e81, #2563eb);
+  box-shadow: 0 18px 35px rgba(2, 6, 23, 0.6);
+}
+
 .usage-badge {
   font-weight: 700;
   letter-spacing: 0.04em;
