@@ -18,7 +18,7 @@
     >
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
-  <body data-theme="light">
+  <body data-theme="light" data-palette="default">
     <nav class="navbar navbar-expand-lg navbar-dark navbar-gradient shadow-sm">
       <div class="container-fluid">
         <button
@@ -93,6 +93,10 @@
             <span class="theme-icon" aria-hidden="true">🌙</span>
             <span class="theme-text">Modo escuro</span>
           </button>
+          <button class="sidebar-link palette-toggle" id="paletteToggle" type="button">
+            <span class="palette-icon" aria-hidden="true">🎨</span>
+            <span class="palette-text">Ativar paleta Tecfag</span>
+          </button>
         </div>
         {% if current_user %}
         <a class="sidebar-link" href="{{ url_for('notifications') }}" data-sidebar-close>
@@ -143,6 +147,9 @@
         const toggle = document.getElementById('themeToggle');
         const icon = toggle ? toggle.querySelector('.theme-icon') : null;
         const label = toggle ? toggle.querySelector('.theme-text') : null;
+        const paletteToggle = document.getElementById('paletteToggle');
+        const paletteIcon = paletteToggle ? paletteToggle.querySelector('.palette-icon') : null;
+        const paletteLabel = paletteToggle ? paletteToggle.querySelector('.palette-text') : null;
 
         const applyTheme = (theme) => {
           body.dataset.theme = theme;
@@ -165,6 +172,30 @@
           }
         };
 
+        const applyPalette = (palette) => {
+          body.dataset.palette = palette;
+          try {
+            localStorage.setItem('tecnologiain-palette', palette);
+          } catch (err) {
+            /* storage may be disabled; ignore */
+          }
+          if (paletteIcon) {
+            paletteIcon.textContent = palette === 'tecfag' ? '🟥' : '🎨';
+          }
+          if (paletteLabel) {
+            paletteLabel.textContent =
+              palette === 'tecfag' ? 'Ativar paleta original' : 'Ativar paleta Tecfag';
+          }
+          if (paletteToggle) {
+            paletteToggle.setAttribute(
+              'aria-label',
+              palette === 'tecfag'
+                ? 'Ativar paleta original do sistema'
+                : 'Ativar paleta inspirada na Tecfag'
+            );
+          }
+        };
+
         const storedTheme = (() => {
           try {
             return localStorage.getItem('tecnologiain-theme');
@@ -176,10 +207,26 @@
           window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         applyTheme(storedTheme || (prefersDark ? 'dark' : 'light'));
 
+        const storedPalette = (() => {
+          try {
+            return localStorage.getItem('tecnologiain-palette');
+          } catch (err) {
+            return null;
+          }
+        })();
+        applyPalette(storedPalette || 'default');
+
         if (toggle) {
           toggle.addEventListener('click', () => {
             const next = body.dataset.theme === 'dark' ? 'light' : 'dark';
             applyTheme(next);
+          });
+        }
+
+        if (paletteToggle) {
+          paletteToggle.addEventListener('click', () => {
+            const next = body.dataset.palette === 'tecfag' ? 'default' : 'tecfag';
+            applyPalette(next);
           });
         }
 
