@@ -6,24 +6,27 @@
   <div class="col-md-3">
     <div class="card surface-card shadow-lg h-100">
       <div class="card-body">
+        <h6 class="text-muted text-uppercase">Valor total em estoque</h6>
+        <p class="display-6 fw-bold">{{ total_inventory_display }}</p>
+        <small class="text-muted">Somatório de quantidade x valor de aquisição.</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card surface-card shadow-lg h-100">
+      <div class="card-body">
         <h6 class="text-muted text-uppercase">Itens cadastrados</h6>
         <p class="display-6 fw-bold">{{ items|length }}</p>
+        <small class="text-muted">{{ categories|length }} categoria{% if categories|length != 1 %}s{% endif %} ativas.</small>
       </div>
     </div>
   </div>
   <div class="col-md-3">
     <div class="card surface-card shadow-lg h-100">
       <div class="card-body">
-        <h6 class="text-muted text-uppercase">Categorias</h6>
-        <p class="display-6 fw-bold">{{ categories|length }}</p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card surface-card shadow-lg h-100">
-      <div class="card-body">
-        <h6 class="text-muted text-uppercase">Alertas ativos</h6>
-        <p class="display-6 fw-bold">{{ notifications|length }}</p>
+        <h6 class="text-muted text-uppercase">Tarefas pendentes</h6>
+        <p class="display-6 fw-bold">{{ task_status_summary.get(TaskStatus.PENDING, 0) }}</p>
+        <small class="text-muted">{{ task_status_summary.get(TaskStatus.IN_PROGRESS, 0) }} em andamento.</small>
       </div>
     </div>
   </div>
@@ -32,6 +35,38 @@
       <div class="card-body">
         <h6 class="text-muted text-uppercase">Itens em atenção</h6>
         <p class="display-6 fw-bold text-warning">{{ low_stock|length }}</p>
+        <small class="text-muted">{{ notifications|length }} alerta{% if notifications|length != 1 %}s{% endif %} ativos.</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-1">
+  <div class="col-lg-6">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0">
+        <h5 class="card-title mb-0">Valor por categoria</h5>
+      </div>
+      <div class="card-body">
+        {% if value_chart_labels %}
+        <canvas id="valueByCategoryChart" height="220"></canvas>
+        {% else %}
+        <p class="text-muted mb-0">Cadastre itens com valores de aquisição para visualizar este gráfico.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0">
+        <h5 class="card-title mb-0">Itens por setor (tags)</h5>
+      </div>
+      <div class="card-body">
+        {% if sector_chart_values and sector_chart_values|sum %}
+        <canvas id="sectorTagChart" height="220"></canvas>
+        {% else %}
+        <p class="text-muted mb-0">Associe tags de setor (Comercial, Marketing, Assistência, Financeiro) para acompanhar a distribuição.</p>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -123,4 +158,88 @@
     </div>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    const styles = getComputedStyle(document.documentElement);
+    const accent = (styles.getPropertyValue('--accent') || '#6366f1').trim();
+    const primary = (styles.getPropertyValue('--primary') || '#22d3ee').trim();
+    const warning = (styles.getPropertyValue('--warning') || '#f97316').trim();
+    const success = (styles.getPropertyValue('--success') || '#22c55e').trim();
+
+    const valueLabels = {{ value_chart_labels|tojson }};
+    const valueData = {{ value_chart_values|tojson }};
+    const valueCanvas = document.getElementById('valueByCategoryChart');
+    if (valueCanvas && valueLabels.length) {
+      new Chart(valueCanvas, {
+        type: 'bar',
+        data: {
+          labels: valueLabels,
+          datasets: [
+            {
+              label: 'Valor total (R$)',
+              data: valueData,
+              backgroundColor: accent || '#6366f1',
+              borderRadius: 12,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback(value) {
+                  return `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
+                },
+              },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+          },
+        },
+      });
+    }
+
+    const sectorLabels = {{ sector_chart_labels|tojson }};
+    const sectorData = {{ sector_chart_values|tojson }};
+    const sectorCanvas = document.getElementById('sectorTagChart');
+    if (sectorCanvas && sectorData.some((value) => value > 0)) {
+      new Chart(sectorCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: sectorLabels,
+          datasets: [
+            {
+              data: sectorData,
+              backgroundColor: [
+                primary || '#22d3ee',
+                accent || '#6366f1',
+                success || '#22c55e',
+                warning || '#f97316',
+              ],
+              borderWidth: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { usePointStyle: true },
+            },
+          },
+        },
+      });
+    }
+  })();
+</script>
 {% endblock %}

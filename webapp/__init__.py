@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from flask import (
@@ -24,6 +24,8 @@ from inventory.models import (
     ItemUsageStatus,
     ROLE_HIERARCHY,
     Role,
+    TaskStatus,
+    TaskUrgency,
     ValidationError,
 )
 from inventory.service import InventoryService
@@ -76,8 +78,12 @@ def create_app() -> Flask:
     prioritario = service.create_tag_definition(name="Prioritário", color="#f97316")
     rede_tag = service.create_tag_definition(name="Rede", color="#22d3ee")
     manutencao = service.create_tag_definition(name="Manutenção", color="#facc15")
+    comercial = service.create_tag_definition(name="Comercial", color="#fb7185")
+    marketing = service.create_tag_definition(name="Marketing", color="#a855f7")
+    assistencia = service.create_tag_definition(name="Assistência", color="#34d399")
+    financeiro = service.create_tag_definition(name="Financeiro", color="#fbbf24")
 
-    service.create_item(
+    notebook = service.create_item(
         user=admin,
         name="Notebook Dell XPS",
         description="Notebook de desenvolvimento",
@@ -89,10 +95,10 @@ def create_app() -> Flask:
         acquisition_value=8200.0,
         supplier="Dell",
         purchase_date=datetime.utcnow(),
-        tags=[desenvolvimento, prioritario],
+        tags=[desenvolvimento, prioritario, comercial],
         usage_status=ItemUsageStatus.IN_USE,
     )
-    service.create_item(
+    switch = service.create_item(
         user=admin,
         name="Switch Cisco 48p",
         description="Switch gerenciável para datacenter",
@@ -104,8 +110,45 @@ def create_app() -> Flask:
         acquisition_value=12500.0,
         supplier="Cisco",
         purchase_date=datetime.utcnow(),
-        tags=[rede_tag, manutencao],
+        tags=[rede_tag, manutencao, financeiro],
         usage_status=ItemUsageStatus.AVAILABLE,
+    )
+
+    presentation_kit = service.create_item(
+        user=admin,
+        name="Kit Apresentação",
+        description="Projetor portátil com case",
+        category_id=hardware.id,
+        quantity=3,
+        minimum_quantity=1,
+        serial_number="KIT-PRES-001",
+        location="Sala de Treinamentos",
+        acquisition_value=3100.0,
+        supplier="Epson",
+        purchase_date=datetime.utcnow(),
+        tags=[marketing, assistencia],
+        usage_status=ItemUsageStatus.AVAILABLE,
+    )
+
+    service.create_task(
+        user=operator,
+        item_id=notebook.id,
+        title="Atualizar inventário de notebooks",
+        description="Conferir número de série dos equipamentos em uso",
+        requester_name="Rafael Bomfim",
+        requester_role="Gestor de T.I",
+        due_at=datetime.utcnow() + timedelta(hours=12),
+        urgency=TaskUrgency.URGENT,
+    )
+    service.create_task(
+        user=operator,
+        item_id=switch.id,
+        title="Auditar racks de rede",
+        description="Verificar patch panels e etiquetar cabos principais",
+        requester_name="Raphael Acosta",
+        requester_role="Operador",
+        due_at=datetime.utcnow() + timedelta(days=3),
+        urgency=TaskUrgency.MEDIUM_TERM,
     )
 
     app.config["inventory_service"] = service
@@ -203,6 +246,15 @@ def register_routes(app: Flask) -> None:
         except ValueError as exc:
             raise ValueError(f"Valor monetário inválido: {raw}") from exc
 
+    def _parse_due_datetime(date_str: Optional[str], time_str: Optional[str]) -> Optional[datetime]:
+        if not date_str:
+            return None
+        try:
+            time_part = time_str or "00:00"
+            return datetime.strptime(f"{date_str} {time_part}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            return None
+
     def _parse_date(raw: Optional[object]) -> Optional[datetime]:
         if raw in (None, ""):
             return None
@@ -245,6 +297,8 @@ def register_routes(app: Flask) -> None:
             "Role": Role,
             "role_hierarchy": ROLE_HIERARCHY,
             "ItemUsageStatus": ItemUsageStatus,
+            "TaskStatus": TaskStatus,
+            "TaskUrgency": TaskUrgency,
         }
 
     @app.route("/login", methods=["GET", "POST"])
@@ -281,6 +335,42 @@ def register_routes(app: Flask) -> None:
         notifications = service.list_notifications()[:5]
         movements = service.list_movements()[-5:]
         item_lookup = {item.id: item for item in items}
+        tasks = service.list_tasks()
+
+        total_inventory_value = sum(item.quantity * item.acquisition_value for item in items)
+        total_inventory_display = f"R$ {total_inventory_value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        value_by_category = []
+        for category in categories:
+            category_value = sum(
+                item.quantity * item.acquisition_value
+                for item in items
+                if item.category_id == category.id
+            )
+            if category_value:
+                value_by_category.append((category.name, round(category_value, 2)))
+
+        def _normalize(text: str) -> str:
+            normalized = unicodedata.normalize("NFKD", text or "")
+            normalized = normalized.encode("ascii", "ignore").decode("ascii")
+            return normalized.strip().lower()
+
+        sector_targets = {
+            "Comercial": 0,
+            "Marketing": 0,
+            "Assistência": 0,
+            "Financeiro": 0,
+        }
+        for item in items:
+            tag_names = {_normalize(tag.name) for tag in item.tags}
+            for label in sector_targets:
+                if _normalize(label) in tag_names:
+                    sector_targets[label] += 1
+
+        task_status_summary = {
+            status: len([task for task in tasks if task.status is status])
+            for status in TaskStatus
+        }
 
         return render_template(
             "dashboard.html",
@@ -290,6 +380,13 @@ def register_routes(app: Flask) -> None:
             notifications=notifications,
             movements=movements,
             item_lookup=item_lookup,
+            tasks=tasks,
+            total_inventory_display=total_inventory_display,
+            value_chart_labels=[label for label, _ in value_by_category],
+            value_chart_values=[value for _, value in value_by_category],
+            sector_chart_labels=list(sector_targets.keys()),
+            sector_chart_values=list(sector_targets.values()),
+            task_status_summary=task_status_summary,
         )
 
     @app.route("/categorias", methods=["GET", "POST"])
@@ -565,6 +662,226 @@ def register_routes(app: Flask) -> None:
         else:
             flash("Tag removida com sucesso!", "success")
         return redirect(url_for("tags"))
+
+    @app.get("/tags/exportar")
+    def export_tags():
+        if not g.current_user:
+            return redirect(url_for("login"))
+        if not _is_manager(g.current_user):
+            flash("Você não possui permissão para exportar tags.", "danger")
+            return redirect(url_for("tags"))
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Tags"
+        sheet.append(["Nome", "Cor"])
+        for tag in service.list_tag_definitions():
+            sheet.append([tag.name, tag.color])
+
+        filename = f"tags_{datetime.utcnow():%Y%m%d_%H%M%S}.xlsx"
+        return _excel_response(filename, workbook)
+
+    @app.post("/tags/importar")
+    def import_tags():
+        if not g.current_user:
+            return redirect(url_for("login"))
+        if not _is_manager(g.current_user):
+            flash("Você não possui permissão para importar tags.", "danger")
+            return redirect(url_for("tags"))
+
+        uploaded = request.files.get("file")
+        if not uploaded or uploaded.filename == "":
+            flash("Selecione um arquivo Excel (.xlsx) para importar.", "warning")
+            return redirect(url_for("tags"))
+
+        try:
+            workbook = load_workbook(uploaded)
+        except InvalidFileException:
+            flash("Arquivo inválido. Envie uma planilha .xlsx.", "danger")
+            return redirect(url_for("tags"))
+
+        sheet = workbook.active
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            flash("A planilha está vazia.", "warning")
+            return redirect(url_for("tags"))
+
+        header = rows[0]
+        header_map = {_normalize_header(value): idx for idx, value in enumerate(header) if value}
+
+        name_idx = header_map.get("nome") or header_map.get("name")
+        if name_idx is None:
+            flash("A coluna 'Nome' é obrigatória.", "danger")
+            return redirect(url_for("tags"))
+
+        color_idx = header_map.get("cor") or header_map.get("color")
+
+        existing = {
+            tag.name.strip().lower(): tag for tag in service.list_tag_definitions()
+        }
+        created = 0
+        updated = 0
+
+        for row in rows[1:]:
+            if not row or name_idx >= len(row):
+                continue
+            raw_name = row[name_idx]
+            if not raw_name:
+                continue
+            name = str(raw_name).strip()
+            if not name:
+                continue
+
+            normalized_key = name.lower()
+            color = _normalize_hex(row[color_idx]) if color_idx is not None else None
+
+            if normalized_key in existing:
+                tag = existing[normalized_key]
+                try:
+                    service.update_tag_definition(tag_id=tag.id, name=name, color=color)
+                except InventoryError as exc:
+                    flash(f"Erro ao atualizar '{name}': {exc}", "danger")
+                    continue
+                updated += 1
+            else:
+                try:
+                    created_tag = service.create_tag_definition(name=name, color=color)
+                except InventoryError as exc:
+                    flash(f"Erro ao criar '{name}': {exc}", "danger")
+                    continue
+                existing[normalized_key] = created_tag
+                created += 1
+
+        if created or updated:
+            flash(
+                f"Importação concluída: {created} criada(s), {updated} atualizada(s).",
+                "success",
+            )
+        else:
+            flash("Nenhuma tag foi importada.", "info")
+        return redirect(url_for("tags"))
+
+    @app.route("/tarefas", methods=["GET", "POST"])
+    def tasks_view():
+        if not g.current_user:
+            return redirect(url_for("login"))
+
+        items = service.list_items()
+        item_lookup = {item.id: item for item in items}
+        status_filter = request.args.get("status") or None
+        urgency_filter = request.args.get("urgency") or None
+
+        if request.method == "POST":
+            title = request.form.get("title", "").strip()
+            item_id = request.form.get("item_id") or ""
+            requester_name = request.form.get("requester_name", "").strip()
+            requester_role = request.form.get("requester_role", "").strip()
+            due_date = request.form.get("due_date") or ""
+            due_time = request.form.get("due_time") or ""
+            description = request.form.get("description") or None
+            urgency = request.form.get("urgency") or None
+            status = request.form.get("status") or None
+
+            if not title or not item_id:
+                flash("Informe um título e selecione o item relacionado.", "warning")
+                return redirect(url_for("tasks_view"))
+
+            due_at = _parse_due_datetime(due_date, due_time)
+            if not due_at:
+                flash("Informe data e horário válidos para a tarefa.", "warning")
+                return redirect(url_for("tasks_view"))
+
+            try:
+                service.create_task(
+                    user=g.current_user,
+                    item_id=item_id,
+                    title=title,
+                    description=description,
+                    requester_name=requester_name,
+                    requester_role=requester_role,
+                    due_at=due_at,
+                    urgency=urgency,
+                    status=status,
+                )
+            except InventoryError as exc:
+                flash(str(exc), "danger")
+            else:
+                flash("Tarefa cadastrada com sucesso!", "success")
+            return redirect(url_for("tasks_view"))
+
+        try:
+            tasks = service.list_tasks(
+                status=status_filter if status_filter else None,
+                urgency=urgency_filter if urgency_filter else None,
+            )
+        except InventoryError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("tasks_view"))
+
+        return render_template(
+            "tasks.html",
+            tasks=tasks,
+            items=items,
+            item_lookup=item_lookup,
+            status_filter=status_filter,
+            urgency_filter=urgency_filter,
+        )
+
+    @app.post("/tarefas/<task_id>/editar")
+    def edit_task(task_id: str):
+        if not g.current_user:
+            return redirect(url_for("login"))
+
+        title = request.form.get("title", "").strip()
+        description = request.form.get("description") or None
+        requester_name = request.form.get("requester_name", "").strip()
+        requester_role = request.form.get("requester_role", "").strip()
+        item_id = request.form.get("item_id") or ""
+        due_date = request.form.get("due_date") or ""
+        due_time = request.form.get("due_time") or ""
+        urgency = request.form.get("urgency") or None
+        status = request.form.get("status") or None
+
+        if not title or not item_id:
+            flash("Informe o título e o item vinculados à tarefa.", "warning")
+            return redirect(url_for("tasks_view"))
+
+        due_at = _parse_due_datetime(due_date, due_time)
+        if not due_at:
+            flash("Informe uma data e horário válidos para a tarefa.", "warning")
+            return redirect(url_for("tasks_view"))
+
+        try:
+            service.update_task(
+                user=g.current_user,
+                task_id=task_id,
+                title=title,
+                description=description,
+                requester_name=requester_name,
+                requester_role=requester_role,
+                due_at=due_at,
+                item_id=item_id,
+                urgency=urgency,
+                status=status,
+            )
+        except InventoryError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Tarefa atualizada com sucesso!", "success")
+        return redirect(url_for("tasks_view"))
+
+    @app.post("/tarefas/<task_id>/remover")
+    def remove_task(task_id: str):
+        if not g.current_user:
+            return redirect(url_for("login"))
+
+        try:
+            service.delete_task(user=g.current_user, task_id=task_id)
+        except InventoryError as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Tarefa removida com sucesso!", "success")
+        return redirect(url_for("tasks_view"))
 
     @app.route("/itens")
     def items():

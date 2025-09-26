@@ -1,7 +1,17 @@
 """Core package for the TecnologiaIN inventory system."""
 
 from .service import InventoryService
-from .models import Item, Movement, Category, User, Role, ItemUsageStatus
+from .models import (
+    Item,
+    Movement,
+    Category,
+    User,
+    Role,
+    ItemUsageStatus,
+    Task,
+    TaskStatus,
+    TaskUrgency,
+)
 
 __all__ = [
     "InventoryService",
@@ -11,4 +21,7 @@ __all__ = [
     "User",
     "Role",
     "ItemUsageStatus",
+    "Task",
+    "TaskStatus",
+    "TaskUrgency",
 ]

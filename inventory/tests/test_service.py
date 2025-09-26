@@ -6,7 +6,14 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from inventory.models import ItemUsageStatus, NotFoundError, Role, ValidationError
+from inventory.models import (
+    ItemUsageStatus,
+    NotFoundError,
+    Role,
+    TaskStatus,
+    TaskUrgency,
+    ValidationError,
+)
 from inventory.service import DEFAULT_TAG_COLOR, InventoryService
 
 
@@ -384,3 +391,90 @@ def test_string_tags_use_predefined_color_when_available(service, manager, categ
     )
 
     assert item.tags[0].color == definition.color
+
+
+def test_task_notifications_flow(service, manager, operator, category):
+    item = service.create_item(
+        user=manager,
+        name="Firewall",
+        description="Firewall perimetral",
+        category_id=category.id,
+        quantity=1,
+        minimum_quantity=1,
+        serial_number="FW-PRD",
+        location="Datacenter",
+        acquisition_value=12000.0,
+        supplier="Fortinet",
+        purchase_date=datetime.utcnow(),
+    )
+
+    due_soon = datetime.utcnow() + timedelta(hours=2)
+    task = service.create_task(
+        user=operator,
+        item_id=item.id,
+        title="Aplicar patch crítico",
+        description="Atualizar firmware do firewall",
+        requester_name="Rafael",
+        requester_role="Gestor de T.I",
+        due_at=due_soon,
+        urgency=TaskUrgency.URGENT,
+    )
+
+    alerts = [n for n in service.list_notifications() if "Tarefa" in n.message]
+    assert alerts
+    assert any("vence em breve" in n.message for n in alerts)
+
+    service.update_task(
+        user=operator,
+        task_id=task.id,
+        due_at=datetime.utcnow() - timedelta(hours=1),
+    )
+
+    alerts = [n for n in service.list_notifications() if "Tarefa" in n.message]
+    assert any("atrasada" in n.message for n in alerts)
+
+    completed = service.update_task(
+        user=operator,
+        task_id=task.id,
+        status=TaskStatus.COMPLETED,
+    )
+
+    assert completed.status is TaskStatus.COMPLETED
+    assert completed.upcoming_alert_sent is False
+    assert completed.overdue_alert_sent is False
+
+
+def test_task_filters_and_cleanup(service, manager, operator, category):
+    item = service.create_item(
+        user=manager,
+        name="Notebook",
+        description="Equipe comercial",
+        category_id=category.id,
+        quantity=5,
+        minimum_quantity=1,
+        serial_number="NB-COM-1",
+        location="Comercial",
+        acquisition_value=6500.0,
+        supplier="Dell",
+        purchase_date=datetime.utcnow(),
+    )
+
+    task = service.create_task(
+        user=operator,
+        item_id=item.id,
+        title="Instalar CRM",
+        description="Configurar software",
+        requester_name="Tarcisio",
+        requester_role="Administrador",
+        due_at=datetime.utcnow() + timedelta(days=2),
+        urgency=TaskUrgency.MEDIUM_TERM,
+    )
+
+    pending = service.list_tasks(status=TaskStatus.PENDING)
+    assert {t.id for t in pending} == {task.id}
+
+    with pytest.raises(ValidationError):
+        service.update_task(user=operator, task_id=task.id, urgency="desconhecida")
+
+    service.delete_item(user=manager, item_id=item.id)
+    assert service.list_tasks() == []

@@ -77,6 +77,59 @@ class TagDefinition:
     color: str
 
 
+class TaskUrgency(str, Enum):
+    """Urgency levels available for scheduling tasks."""
+
+    URGENT = "urgent"
+    MEDIUM_TERM = "medium_term"
+    LONG_TERM = "long_term"
+
+    @property
+    def label(self) -> str:
+        mapping = {
+            TaskUrgency.URGENT: "Urgente",
+            TaskUrgency.MEDIUM_TERM: "Médio prazo",
+            TaskUrgency.LONG_TERM: "Longo prazo",
+        }
+        return mapping[self]
+
+
+class TaskStatus(str, Enum):
+    """Supported statuses for operational tasks."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+    @property
+    def label(self) -> str:
+        mapping = {
+            TaskStatus.PENDING: "Pendente",
+            TaskStatus.IN_PROGRESS: "Em progresso",
+            TaskStatus.COMPLETED: "Concluída",
+        }
+        return mapping[self]
+
+
+@dataclass(slots=True)
+class Task:
+    """Represents a scheduled activity associated with a specific item."""
+
+    id: str
+    item_id: str
+    title: str
+    description: Optional[str]
+    requester_name: str
+    requester_role: str
+    due_at: datetime
+    urgency: TaskUrgency
+    status: TaskStatus = TaskStatus.PENDING
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+    upcoming_alert_sent: bool = False
+    overdue_alert_sent: bool = False
+
+
 @dataclass(slots=True)
 class Item:
     """Represents an inventory item."""

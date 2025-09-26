@@ -25,6 +25,9 @@ from .models import (
     ROLE_HIERARCHY,
     Tag,
     TagDefinition,
+    Task,
+    TaskStatus,
+    TaskUrgency,
     ScheduledReport,
     User,
     ValidationError,
@@ -51,6 +54,7 @@ class InventoryService:
         self._users: Dict[str, User] = {}
         self._movements: Dict[str, Movement] = {}
         self._notifications: Dict[str, Notification] = {}
+        self._tasks: Dict[str, Task] = {}
         self._audit_log: List[AuditEntry] = []
         self._scheduled_reports: Dict[str, ScheduledReport] = {}
         self._report_history: Dict[str, List[Report]] = defaultdict(list)
@@ -174,6 +178,101 @@ class InventoryService:
         normalized_name = str(name).strip()
         normalized_color = self._normalize_hex_color(str(color) if color is not None else None, default=DEFAULT_TAG_COLOR)
         return Tag(name=normalized_name, color=normalized_color)
+
+    def _coerce_task_urgency(self, value: Union[TaskUrgency, str, None]) -> TaskUrgency:
+        if value is None:
+            return TaskUrgency.MEDIUM_TERM
+        if isinstance(value, TaskUrgency):
+            return value
+
+        normalized = unicodedata.normalize("NFD", str(value))
+        normalized = normalized.encode("ascii", "ignore").decode("ascii")
+        normalized = normalized.strip().lower().replace(" ", "_")
+
+        mapping = {
+            "urgente": TaskUrgency.URGENT,
+            "urgent": TaskUrgency.URGENT,
+            "imediato": TaskUrgency.URGENT,
+            "medio_prazo": TaskUrgency.MEDIUM_TERM,
+            "medio": TaskUrgency.MEDIUM_TERM,
+            "medium_term": TaskUrgency.MEDIUM_TERM,
+            "longo_prazo": TaskUrgency.LONG_TERM,
+            "longo": TaskUrgency.LONG_TERM,
+            "long_term": TaskUrgency.LONG_TERM,
+        }
+
+        if normalized in mapping:
+            return mapping[normalized]
+
+        raise ValidationError("Urgência de tarefa inválida")
+
+    def _coerce_task_status(self, value: Union[TaskStatus, str, None]) -> TaskStatus:
+        if value is None:
+            return TaskStatus.PENDING
+        if isinstance(value, TaskStatus):
+            return value
+
+        normalized = unicodedata.normalize("NFD", str(value))
+        normalized = normalized.encode("ascii", "ignore").decode("ascii")
+        normalized = normalized.strip().lower().replace(" ", "_")
+
+        mapping = {
+            "pendente": TaskStatus.PENDING,
+            "pending": TaskStatus.PENDING,
+            "em_progresso": TaskStatus.IN_PROGRESS,
+            "emprogresso": TaskStatus.IN_PROGRESS,
+            "in_progress": TaskStatus.IN_PROGRESS,
+            "andamento": TaskStatus.IN_PROGRESS,
+            "concluida": TaskStatus.COMPLETED,
+            "concluido": TaskStatus.COMPLETED,
+            "completed": TaskStatus.COMPLETED,
+            "finalizada": TaskStatus.COMPLETED,
+        }
+
+        if normalized in mapping:
+            return mapping[normalized]
+
+        raise ValidationError("Status de tarefa inválido")
+
+    def _evaluate_task_alerts(self, task: Task) -> None:
+        item = self._items.get(task.item_id)
+        if not item:
+            return
+
+        if task.status is TaskStatus.COMPLETED:
+            task.upcoming_alert_sent = False
+            task.overdue_alert_sent = False
+            return
+
+        now = datetime.utcnow()
+        threshold = now + timedelta(hours=24)
+
+        if task.due_at <= now:
+            if not task.overdue_alert_sent:
+                self._emit_notification(
+                    f"Tarefa '{task.title}' para o item {item.name} está atrasada.",
+                    severity="error",
+                )
+                task.overdue_alert_sent = True
+            task.upcoming_alert_sent = True
+            return
+
+        if task.due_at <= threshold:
+            if not task.upcoming_alert_sent:
+                self._emit_notification(
+                    f"Tarefa '{task.title}' para o item {item.name} vence em breve.",
+                    severity="warning",
+                )
+                task.upcoming_alert_sent = True
+            task.overdue_alert_sent = False
+        else:
+            task.upcoming_alert_sent = False
+            task.overdue_alert_sent = False
+
+    def _purge_tasks_for_item(self, item_id: str) -> None:
+        for task_id, task in list(self._tasks.items()):
+            if task.item_id == item_id:
+                del self._tasks[task_id]
 
     def _get_category_or_raise(self, category_id: str) -> Category:
         try:
@@ -530,6 +629,7 @@ class InventoryService:
     def remove_item(self, *, user: User, item_id: str, reason: str) -> None:
         self._require_role(user, Role.MANAGER)
         item = self._get_item_or_raise(item_id)
+        self._purge_tasks_for_item(item_id)
         del self._items[item_id]
         self._append_audit(
             user=user,
@@ -558,6 +658,7 @@ class InventoryService:
         self._require_role(user, Role.MANAGER)
         item = self._get_item_or_raise(item_id)
 
+        self._purge_tasks_for_item(item_id)
         del self._items[item_id]
         self._append_audit(
             user=user,
@@ -565,6 +666,189 @@ class InventoryService:
             entity="item",
             entity_id=item.id,
             payload={"name": item.name},
+        )
+
+    # ------------------------------------------------------------------
+    # Tasks
+    # ------------------------------------------------------------------
+    def create_task(
+        self,
+        *,
+        user: User,
+        item_id: str,
+        title: str,
+        description: Optional[str],
+        requester_name: str,
+        requester_role: str,
+        due_at: datetime,
+        urgency: Union[TaskUrgency, str, None] = None,
+        status: Union[TaskStatus, str, None] = None,
+    ) -> Task:
+        self._require_role(user, Role.OPERATOR)
+        item = self._get_item_or_raise(item_id)
+
+        normalized_title = title.strip()
+        if not normalized_title:
+            raise ValidationError("Título da tarefa é obrigatório")
+
+        requester_name = requester_name.strip()
+        requester_role = requester_role.strip()
+        if not requester_name or not requester_role:
+            raise ValidationError("Informe o solicitante e a função da tarefa")
+
+        if not isinstance(due_at, datetime):
+            raise ValidationError("Data e hora da tarefa são obrigatórias")
+
+        cleaned_description = description.strip() if description else None
+        normalized_due = due_at.replace(second=0, microsecond=0)
+        urgency_value = self._coerce_task_urgency(urgency)
+        status_value = self._coerce_task_status(status)
+
+        task = Task(
+            id=str(uuid4()),
+            item_id=item.id,
+            title=normalized_title,
+            description=cleaned_description,
+            requester_name=requester_name,
+            requester_role=requester_role,
+            due_at=normalized_due,
+            urgency=urgency_value,
+            status=status_value,
+        )
+        self._tasks[task.id] = task
+        self._append_audit(
+            user=user,
+            action="criar_tarefa",
+            entity="task",
+            entity_id=task.id,
+            payload={
+                "item_id": item.id,
+                "title": task.title,
+                "due_at": task.due_at.isoformat(),
+                "urgency": task.urgency.value,
+                "status": task.status.value,
+            },
+        )
+        self._evaluate_task_alerts(task)
+        return task
+
+    def list_tasks(
+        self,
+        *,
+        status: Optional[Union[TaskStatus, str]] = None,
+        item_id: Optional[str] = None,
+        urgency: Optional[Union[TaskUrgency, str]] = None,
+    ) -> List[Task]:
+        for task in self._tasks.values():
+            self._evaluate_task_alerts(task)
+
+        tasks = list(self._tasks.values())
+        if status is not None:
+            status_value = self._coerce_task_status(status)
+            tasks = [task for task in tasks if task.status is status_value]
+        if item_id is not None:
+            tasks = [task for task in tasks if task.item_id == item_id]
+        if urgency is not None:
+            urgency_value = self._coerce_task_urgency(urgency)
+            tasks = [task for task in tasks if task.urgency is urgency_value]
+
+        tasks.sort(key=lambda task: task.due_at)
+        return tasks
+
+    def get_task(self, task_id: str) -> Task:
+        task = self._tasks.get(task_id)
+        if not task:
+            raise NotFoundError("Tarefa não encontrada")
+        self._evaluate_task_alerts(task)
+        return task
+
+    def update_task(
+        self,
+        *,
+        user: User,
+        task_id: str,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        requester_name: Optional[str] = None,
+        requester_role: Optional[str] = None,
+        due_at: Optional[datetime] = None,
+        urgency: Union[TaskUrgency, str, None] = None,
+        status: Union[TaskStatus, str, None] = None,
+        item_id: Optional[str] = None,
+    ) -> Task:
+        self._require_role(user, Role.OPERATOR)
+        task = self._tasks.get(task_id)
+        if not task:
+            raise NotFoundError("Tarefa não encontrada")
+
+        updates: Dict[str, object] = {}
+
+        if title is not None:
+            normalized_title = title.strip()
+            if not normalized_title:
+                raise ValidationError("Título da tarefa é obrigatório")
+            updates["title"] = normalized_title
+
+        if description is not None:
+            updates["description"] = description.strip() or None
+
+        if requester_name is not None:
+            requester_name = requester_name.strip()
+            if not requester_name:
+                raise ValidationError("Informe o solicitante da tarefa")
+            updates["requester_name"] = requester_name
+
+        if requester_role is not None:
+            requester_role = requester_role.strip()
+            if not requester_role:
+                raise ValidationError("Informe a função do solicitante")
+            updates["requester_role"] = requester_role
+
+        due_changed = False
+        if due_at is not None:
+            if not isinstance(due_at, datetime):
+                raise ValidationError("Data e hora inválidas para a tarefa")
+            updates["due_at"] = due_at.replace(second=0, microsecond=0)
+            due_changed = True
+
+        if urgency is not None:
+            updates["urgency"] = self._coerce_task_urgency(urgency)
+
+        if status is not None:
+            updates["status"] = self._coerce_task_status(status)
+
+        if item_id is not None:
+            self._get_item_or_raise(item_id)
+            updates["item_id"] = item_id
+
+        if due_changed or updates.get("status") is TaskStatus.PENDING:
+            updates.setdefault("upcoming_alert_sent", False)
+            updates.setdefault("overdue_alert_sent", False)
+
+        updated_task = replace(task, **updates, updated_at=datetime.utcnow())
+        self._tasks[task_id] = updated_task
+        self._append_audit(
+            user=user,
+            action="atualizar_tarefa",
+            entity="task",
+            entity_id=task_id,
+            payload=updates,
+        )
+        self._evaluate_task_alerts(updated_task)
+        return updated_task
+
+    def delete_task(self, *, user: User, task_id: str) -> None:
+        self._require_role(user, Role.OPERATOR)
+        task = self._tasks.pop(task_id, None)
+        if not task:
+            raise NotFoundError("Tarefa não encontrada")
+
+        self._append_audit(
+            user=user,
+            action="remover_tarefa",
+            entity="task",
+            entity_id=task_id,
+            payload={"title": task.title},
         )
 
     # ------------------------------------------------------------------

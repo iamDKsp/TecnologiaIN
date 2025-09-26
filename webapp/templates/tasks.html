@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <h1 class="page-title mb-1">Tarefas operacionais</h1>
+    <p class="text-muted mb-0">Planeje atividades, acompanhe prazos e mantenha os itens do inventário atualizados.</p>
+  </div>
+  <span class="badge rounded-pill text-bg-primary shadow-sm">{{ tasks|length }} tarefa{% if tasks|length != 1 %}s{% endif %}</span>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-4">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0">
+        <h5 class="mb-0">Nova tarefa</h5>
+      </div>
+      <div class="card-body">
+        <form method="post" class="task-form">
+          <div class="mb-3">
+            <label class="form-label" for="taskTitle">Título</label>
+            <input class="form-control" id="taskTitle" name="title" placeholder="Ex.: Revisar backups" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="taskItem">Item associado</label>
+            <select class="form-select" id="taskItem" name="item_id" required>
+              <option value="" disabled selected>Selecione um item</option>
+              {% for item in items %}
+              <option value="{{ item.id }}">{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label" for="taskDueDate">Data</label>
+              <input class="form-control" id="taskDueDate" name="due_date" type="date" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="taskDueTime">Horário</label>
+              <input class="form-control" id="taskDueTime" name="due_time" type="time" required>
+            </div>
+          </div>
+          <div class="row g-3 mt-0 mt-sm-2">
+            <div class="col-sm-6">
+              <label class="form-label" for="taskUrgency">Urgência</label>
+              <select class="form-select" id="taskUrgency" name="urgency">
+                {% for urgency in TaskUrgency %}
+                <option value="{{ urgency.value }}">{{ urgency.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="taskStatus">Status inicial</label>
+              <select class="form-select" id="taskStatus" name="status">
+                {% for status in TaskStatus %}
+                <option value="{{ status.value }}"{% if status is TaskStatus.PENDING %} selected{% endif %}>{{ status.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mb-3 mt-3">
+            <label class="form-label" for="taskRequester">Solicitante</label>
+            <input class="form-control" id="taskRequester" name="requester_name" placeholder="Nome do solicitante" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="taskRequesterRole">Função</label>
+            <input class="form-control" id="taskRequesterRole" name="requester_role" placeholder="Ex.: Gestor de T.I" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="taskDescription">Descrição</label>
+            <textarea class="form-control" id="taskDescription" name="description" rows="3" placeholder="Detalhes, checklists ou observações"></textarea>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">Cadastrar tarefa</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-8">
+    <div class="card shadow-lg surface-card h-100">
+      <div class="card-header border-0 d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <h5 class="mb-0">Tarefas agendadas</h5>
+          <small class="text-muted">Use os filtros para priorizar urgências e acompanhar o andamento.</small>
+        </div>
+        <form class="d-flex flex-wrap align-items-center gap-2" method="get">
+          <select class="form-select form-select-sm" name="status">
+            <option value="">Status</option>
+            {% for status in TaskStatus %}
+            <option value="{{ status.value }}"{% if status_filter == status.value %} selected{% endif %}>{{ status.label }}</option>
+            {% endfor %}
+          </select>
+          <select class="form-select form-select-sm" name="urgency">
+            <option value="">Urgência</option>
+            {% for urgency in TaskUrgency %}
+            <option value="{{ urgency.value }}"{% if urgency_filter == urgency.value %} selected{% endif %}>{{ urgency.label }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-soft-primary btn-sm" type="submit">Filtrar</button>
+          <a class="btn btn-soft-secondary btn-sm" href="{{ url_for('tasks_view') }}">Limpar</a>
+        </form>
+      </div>
+      <div class="card-body">
+        {% if tasks %}
+        <div class="table-responsive">
+          <table class="table align-middle task-table">
+            <thead>
+              <tr>
+                <th scope="col">Status</th>
+                <th scope="col">Tarefa</th>
+                <th scope="col">Prazo</th>
+                <th scope="col">Urgência</th>
+                <th scope="col">Solicitante</th>
+                <th scope="col" class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for task in tasks %}
+              <tr>
+                <td>
+                  <span class="badge task-status task-status-{{ task.status.value }}">{{ task.status.label }}</span>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ task.title }}</div>
+                  <small class="text-muted">{{ item_lookup[task.item_id].name if task.item_id in item_lookup else task.item_id }}</small>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ task.due_at.strftime('%d/%m/%Y') }}</div>
+                  <small class="text-muted">{{ task.due_at.strftime('%H:%M') }}</small>
+                </td>
+                <td>
+                  <span class="badge urgency-badge urgency-{{ task.urgency.value }}">{{ task.urgency.label }}</span>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ task.requester_name }}</div>
+                  <small class="text-muted">{{ task.requester_role }}</small>
+                </td>
+                <td class="text-end">
+                  <div class="d-flex justify-content-end gap-2">
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      type="button"
+                      data-action="edit-task"
+                      data-task='{{ {
+                        "id": task.id,
+                        "title": task.title,
+                        "description": task.description or "",
+                        "item_id": task.item_id,
+                        "due_date": task.due_at.strftime("%Y-%m-%d"),
+                        "due_time": task.due_at.strftime("%H:%M"),
+                        "urgency": task.urgency.value,
+                        "status": task.status.value,
+                        "requester_name": task.requester_name,
+                        "requester_role": task.requester_role,
+                      } | tojson }}'
+                    >Editar</button>
+                    <form action="{{ url_for('remove_task', task_id=task.id) }}" method="post" onsubmit="return confirm('Deseja remover esta tarefa?');">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Nenhuma tarefa cadastrada. Utilize o formulário ao lado para criar a primeira.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div aria-hidden="true" class="modal fade" id="editTaskModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="editTaskForm" method="post">
+        <div class="modal-header">
+          <h5 class="modal-title">Editar tarefa</h5>
+          <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="editTaskTitle">Título</label>
+              <input class="form-control" id="editTaskTitle" name="title" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="editTaskItem">Item</label>
+              <select class="form-select" id="editTaskItem" name="item_id" required>
+                {% for item in items %}
+                <option value="{{ item.id }}">{{ item.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="row g-3 mt-0 mt-md-2">
+            <div class="col-md-4">
+              <label class="form-label" for="editTaskDate">Data</label>
+              <input class="form-control" id="editTaskDate" name="due_date" type="date" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="editTaskTime">Horário</label>
+              <input class="form-control" id="editTaskTime" name="due_time" type="time" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="editTaskUrgency">Urgência</label>
+              <select class="form-select" id="editTaskUrgency" name="urgency">
+                {% for urgency in TaskUrgency %}
+                <option value="{{ urgency.value }}">{{ urgency.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="row g-3 mt-0 mt-md-2">
+            <div class="col-md-6">
+              <label class="form-label" for="editTaskStatus">Status</label>
+              <select class="form-select" id="editTaskStatus" name="status">
+                {% for status in TaskStatus %}
+                <option value="{{ status.value }}">{{ status.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="editTaskRequester">Solicitante</label>
+              <input class="form-control" id="editTaskRequester" name="requester_name" required>
+            </div>
+          </div>
+          <div class="row g-3 mt-0 mt-md-2">
+            <div class="col-md-6">
+              <label class="form-label" for="editTaskRequesterRole">Função</label>
+              <input class="form-control" id="editTaskRequesterRole" name="requester_role" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="editTaskDescription">Descrição</label>
+              <textarea class="form-control" id="editTaskDescription" name="description" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary" type="submit">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  (function () {
+    const modalEl = document.getElementById('editTaskModal');
+    if (!modalEl) {
+      return;
+    }
+    const form = document.getElementById('editTaskForm');
+    const actionTemplate = '{{ url_for("edit_task", task_id="__TASK__") }}';
+    const titleInput = document.getElementById('editTaskTitle');
+    const itemSelect = document.getElementById('editTaskItem');
+    const dateInput = document.getElementById('editTaskDate');
+    const timeInput = document.getElementById('editTaskTime');
+    const urgencySelect = document.getElementById('editTaskUrgency');
+    const statusSelect = document.getElementById('editTaskStatus');
+    const requesterInput = document.getElementById('editTaskRequester');
+    const requesterRoleInput = document.getElementById('editTaskRequesterRole');
+    const descriptionInput = document.getElementById('editTaskDescription');
+
+    const openModal = (data) => {
+      if (!data || !data.id) {
+        return;
+      }
+      form.action = actionTemplate.replace('__TASK__', data.id);
+      if (titleInput) {
+        titleInput.value = data.title || '';
+      }
+      if (itemSelect) {
+        itemSelect.value = data.item_id || '';
+      }
+      if (dateInput) {
+        dateInput.value = data.due_date || '';
+      }
+      if (timeInput) {
+        timeInput.value = data.due_time || '';
+      }
+      if (urgencySelect) {
+        urgencySelect.value = data.urgency || '';
+      }
+      if (statusSelect) {
+        statusSelect.value = data.status || '';
+      }
+      if (requesterInput) {
+        requesterInput.value = data.requester_name || '';
+      }
+      if (requesterRoleInput) {
+        requesterRoleInput.value = data.requester_role || '';
+      }
+      if (descriptionInput) {
+        descriptionInput.value = data.description || '';
+      }
+
+      if (window.bootstrap && window.bootstrap.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      } else {
+        modalEl.classList.add('show');
+        modalEl.style.display = 'block';
+      }
+    };
+
+    document.querySelectorAll('[data-action="edit-task"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        try {
+          const data = JSON.parse(button.getAttribute('data-task'));
+          openModal(data);
+        } catch (err) {
+          console.error('Não foi possível carregar os dados da tarefa', err);
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}
