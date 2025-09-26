@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from inventory.models import NotFoundError, Role, ValidationError
+from inventory.models import ItemUsageStatus, NotFoundError, Role, ValidationError
 from inventory.service import DEFAULT_TAG_COLOR, InventoryService
 
 
@@ -55,6 +55,7 @@ def test_create_item_and_low_stock_notification(service, manager, category):
     )
 
     assert item.quantity == 2
+    assert item.usage_status is ItemUsageStatus.AVAILABLE
     assert {tag.name.lower(): tag.color for tag in item.tags} == {
         "novo": "#22d3ee",
         "prioritário": "#f97316",
@@ -88,6 +89,33 @@ def test_register_movement_updates_quantity(service, operator, manager, category
     updated_item = service.list_items()[0]
     assert movement.quantity == -3
     assert updated_item.quantity == 7
+
+
+def test_usage_status_updates(service, manager, category):
+    item = service.create_item(
+        user=manager,
+        name="Tablet",
+        description="Tablet gráfico",
+        category_id=category.id,
+        quantity=3,
+        minimum_quantity=1,
+        serial_number="TAB-001",
+        location="Estúdio",
+        acquisition_value=3500.0,
+        supplier="Wacom",
+        purchase_date=datetime.utcnow(),
+        usage_status="em uso",
+    )
+
+    assert item.usage_status is ItemUsageStatus.IN_USE
+
+    updated = service.update_item(
+        user=manager,
+        item_id=item.id,
+        usage_status="disponivel",
+    )
+
+    assert updated.usage_status is ItemUsageStatus.AVAILABLE
 
 
 def test_report_generation(service, manager, operator, category):

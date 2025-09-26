@@ -7,7 +7,25 @@
     <p class="text-muted mb-0">Acompanhe todos os ativos cadastrados e mantenha o estoque em ordem.</p>
   </div>
   {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
-  <a class="btn btn-primary btn-lg" href="{{ url_for('new_item') }}">Novo item</a>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <button
+      class="btn btn-outline-secondary btn-lg btn-icon"
+      id="refreshItems"
+      title="Recarregar lista"
+      type="button"
+    >
+      ⟳
+    </button>
+    <button
+      class="btn btn-outline-primary btn-lg"
+      data-bs-target="#movementModal"
+      data-bs-toggle="modal"
+      type="button"
+    >
+      Ajustar estoque
+    </button>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('new_item') }}">Novo item</a>
+  </div>
   {% endif %}
 </div>
 
@@ -31,6 +49,7 @@
         <th>Categoria</th>
         <th>Quantidade</th>
         <th>Mínimo</th>
+        <th>Status</th>
         <th>Localização</th>
         <th>Fornecedor</th>
         <th>Tags</th>
@@ -47,6 +66,9 @@
         <td>{{ category_lookup[item.category_id].name if item.category_id in category_lookup else '—' }}</td>
         <td class="fw-semibold {{ 'text-danger' if item.quantity <= item.minimum_quantity else '' }}">{{ item.quantity }}</td>
         <td>{{ item.minimum_quantity }}</td>
+        <td>
+          <span class="badge usage-badge usage-{{ item.usage_status.value }}">{{ item.usage_status.label.upper() }}</span>
+        </td>
         <td>{{ item.location }}</td>
         <td>{{ item.supplier or '—' }}</td>
         <td>
@@ -76,10 +98,69 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="8" class="text-center text-muted">Nenhum item encontrado.</td>
+        <td colspan="9" class="text-center text-muted">Nenhum item encontrado.</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+<div aria-hidden="true" class="modal fade" id="movementModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('adjust_item_stock') }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Entrada ou baixa de item</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body row g-3">
+          <input type="hidden" name="categoria" value="{{ selected_category or '' }}">
+          <div class="col-12">
+            <label class="form-label" for="movementItem">Selecione o item</label>
+            <select class="form-select" id="movementItem" name="item_id" required>
+              <option value="" disabled selected>Escolha um item</option>
+              {% for item in all_items %}
+              <option value="{{ item.id }}">{{ item.name }} · {{ category_lookup[item.category_id].name if item.category_id in category_lookup else 'Sem categoria' }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="movementDirection">Tipo de movimento</label>
+            <select class="form-select" id="movementDirection" name="direction">
+              <option value="entrada">Entrada</option>
+              <option value="baixa">Baixa</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="movementQuantity">Quantidade</label>
+            <input class="form-control" id="movementQuantity" min="1" name="quantity" required type="number" value="1">
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="movementType">Motivo</label>
+            <input class="form-control" id="movementType" name="movement_type" placeholder="Compra, devolução, manutenção...">
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="movementNotes">Observações</label>
+            <textarea class="form-control" id="movementNotes" name="notes" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+          <button class="btn btn-primary" type="submit">Registrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const refreshButton = document.getElementById('refreshItems');
+    if (refreshButton) {
+      refreshButton.addEventListener('click', () => {
+        window.location.reload();
+      });
+    }
+  })();
+</script>
 {% endblock %}

@@ -8,6 +8,17 @@ from enum import Enum
 from typing import Dict, List, Optional, Set
 
 
+class ItemUsageStatus(str, Enum):
+    """Represents whether an item is currently available or in use."""
+
+    AVAILABLE = "available"
+    IN_USE = "in_use"
+
+    @property
+    def label(self) -> str:
+        return "Disponível" if self is ItemUsageStatus.AVAILABLE else "Em uso"
+
+
 class Role(str, Enum):
     """Supported user roles.
 
@@ -74,7 +85,7 @@ class Item:
     purchase_date: Optional[datetime]
     tags: List[Tag] = field(default_factory=list)
     attachments: List[str] = field(default_factory=list)
-    status: str = "ativo"
+    usage_status: ItemUsageStatus = ItemUsageStatus.AVAILABLE
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 

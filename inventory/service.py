@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import re
+import unicodedata
 from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Dict, Iterable, List, Optional, Tuple, Union
@@ -14,6 +15,7 @@ from .models import (
     Category,
     InventoryError,
     Item,
+    ItemUsageStatus,
     Movement,
     NotFoundError,
     Notification,
@@ -33,6 +35,7 @@ DEFAULT_CATEGORY_COLOR = "#6366f1"
 DEFAULT_TAG_COLOR = "#14b8a6"
 
 TagInput = Union[Tag, Tuple[str, str], Dict[str, str], str]
+UsageStatusInput = Union[ItemUsageStatus, str, None]
 
 
 class InventoryService:
@@ -81,6 +84,29 @@ class InventoryService:
         notification = Notification(id=str(uuid4()), message=message, severity=severity)
         self._notifications[notification.id] = notification
         return notification
+
+    def _coerce_usage_status(self, status: UsageStatusInput) -> ItemUsageStatus:
+        if status is None:
+            return ItemUsageStatus.AVAILABLE
+        if isinstance(status, ItemUsageStatus):
+            return status
+
+        normalized = unicodedata.normalize("NFD", str(status))
+        normalized = normalized.encode("ascii", "ignore").decode("ascii")
+        normalized = normalized.strip().lower().replace(" ", "_")
+
+        mapping = {
+            "available": ItemUsageStatus.AVAILABLE,
+            "disponivel": ItemUsageStatus.AVAILABLE,
+            "em_uso": ItemUsageStatus.IN_USE,
+            "emuso": ItemUsageStatus.IN_USE,
+            "in_use": ItemUsageStatus.IN_USE,
+        }
+
+        if normalized in mapping:
+            return mapping[normalized]
+
+        raise ValidationError("Status de uso inválido para o item")
 
     def _normalize_hex_color(self, color: Optional[str], *, default: str) -> str:
         if not color:
@@ -235,6 +261,7 @@ class InventoryService:
         purchase_date: Optional[datetime],
         tags: Optional[Iterable[TagInput]] = None,
         attachments: Optional[Iterable[str]] = None,
+        usage_status: UsageStatusInput = None,
     ) -> Item:
         self._require_role(user, Role.MANAGER)
         self._get_category_or_raise(category_id)
@@ -254,6 +281,7 @@ class InventoryService:
             acquisition_value=acquisition_value,
             supplier=supplier,
             purchase_date=purchase_date,
+            usage_status=self._coerce_usage_status(usage_status),
         )
         if tags:
             coerced = [self._coerce_tag(tag) for tag in tags]
@@ -290,11 +318,14 @@ class InventoryService:
             "acquisition_value",
             "supplier",
             "purchase_date",
-            "status",
+            "usage_status",
         }
         invalid = set(updates) - supported
         if invalid:
             raise ValidationError(f"Campos inválidos para atualização: {', '.join(invalid)}")
+
+        if "usage_status" in updates:
+            updates["usage_status"] = self._coerce_usage_status(updates["usage_status"])
 
         updated = replace(item, **updates, updated_at=datetime.utcnow())
         self._items[item_id] = updated

@@ -371,6 +371,43 @@ body[data-theme="dark"] .color-swatch {
   box-shadow: 0 0 0 3px rgba(91, 60, 196, 0.18);
 }
 
+.btn-icon {
+  width: 3rem;
+  height: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.85rem;
+  font-size: 1.5rem;
+  line-height: 1;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-icon:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+}
+
+.usage-badge {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.usage-badge.usage-available {
+  color: #065f46;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.usage-badge.usage-in_use {
+  color: #8b5cf6;
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
 body[data-theme="dark"] .tag-chip {
   background: rgba(15, 23, 42, 0.88);
   color: var(--tag-color, var(--color-secondary));
@@ -380,6 +417,18 @@ body[data-theme="dark"] .tag-chip {
 
 body[data-theme="dark"] .tag-chip::before {
   box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.75);
+}
+
+body[data-theme="dark"] .usage-badge.usage-available {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+body[data-theme="dark"] .usage-badge.usage-in_use {
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(196, 181, 253, 0.45);
 }
 
 body[data-theme="dark"] .text-muted {

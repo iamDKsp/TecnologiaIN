@@ -16,7 +16,13 @@ from flask import (
     url_for,
 )
 
-from inventory.models import InventoryError, ROLE_HIERARCHY, Role, ValidationError
+from inventory.models import (
+    InventoryError,
+    ItemUsageStatus,
+    ROLE_HIERARCHY,
+    Role,
+    ValidationError,
+)
 from inventory.service import InventoryService
 
 
@@ -74,6 +80,7 @@ def create_app() -> Flask:
         supplier="Dell",
         purchase_date=datetime.utcnow(),
         tags=[("Desenvolvimento", "#14b8a6"), ("Prioritário", "#f97316")],
+        usage_status=ItemUsageStatus.IN_USE,
     )
     service.create_item(
         user=admin,
@@ -88,6 +95,7 @@ def create_app() -> Flask:
         supplier="Cisco",
         purchase_date=datetime.utcnow(),
         tags=[("Rede", "#22d3ee")],
+        usage_status=ItemUsageStatus.AVAILABLE,
     )
 
     app.config["inventory_service"] = service
@@ -119,6 +127,7 @@ def register_routes(app: Flask) -> None:
             "current_user": g.get("current_user"),
             "Role": Role,
             "role_hierarchy": ROLE_HIERARCHY,
+            "ItemUsageStatus": ItemUsageStatus,
         }
 
     @app.route("/login", methods=["GET", "POST"])
@@ -215,13 +224,19 @@ def register_routes(app: Flask) -> None:
 
         selected_category = request.args.get("categoria") or None
         category_lookup = {c.id: c for c in service.list_categories()}
-        items = service.list_items(category_id=selected_category) if selected_category else service.list_items()
+        items = (
+            service.list_items(category_id=selected_category)
+            if selected_category
+            else service.list_items()
+        )
         return render_template(
             "items.html",
             items=items,
             categories=category_lookup.values(),
             category_lookup=category_lookup,
             selected_category=selected_category,
+            usage_statuses=list(ItemUsageStatus),
+            all_items=service.list_items(),
         )
 
     @app.route("/itens/novo", methods=["GET", "POST"])
@@ -230,6 +245,7 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("login"))
 
         categories = service.list_categories()
+        template_ctx = {"categories": categories, "usage_statuses": list(ItemUsageStatus)}
         if request.method == "POST":
             form = request.form
             try:
@@ -245,7 +261,7 @@ def register_routes(app: Flask) -> None:
                 location = form.get("location", "").strip()
                 if not all([name, description, category_id, location]):
                     flash("Preencha todos os campos obrigatórios", "warning")
-                    return render_template("item_form.html", categories=categories)
+                    return render_template("item_form.html", **template_ctx)
                 purchase_date = form.get("purchase_date")
                 parsed_date: Optional[datetime] = None
                 if purchase_date:
@@ -253,7 +269,7 @@ def register_routes(app: Flask) -> None:
                         parsed_date = datetime.strptime(purchase_date, "%Y-%m-%d")
                     except ValueError:
                         flash("Data de compra inválida", "danger")
-                        return render_template("item_form.html", categories=categories)
+                        return render_template("item_form.html", **template_ctx)
                 tag_names = form.getlist("tag_names[]")
                 tag_colors = form.getlist("tag_colors[]")
                 tags = []
@@ -278,6 +294,7 @@ def register_routes(app: Flask) -> None:
                         purchase_date=parsed_date,
                         tags=tags,
                         attachments=attachments,
+                        usage_status=form.get("usage_status") or None,
                     )
                 except InventoryError as exc:
                     flash(str(exc), "danger")
@@ -285,7 +302,7 @@ def register_routes(app: Flask) -> None:
                     flash("Item cadastrado com sucesso!", "success")
                     return redirect(url_for("items"))
 
-        return render_template("item_form.html", categories=categories)
+        return render_template("item_form.html", **template_ctx)
 
     @app.post("/itens/<item_id>/remover")
     def remove_item(item_id: str):
@@ -300,6 +317,45 @@ def register_routes(app: Flask) -> None:
             flash(str(exc), "danger")
         else:
             flash("Item removido com sucesso!", "success")
+
+        if selected_category:
+            return redirect(url_for("items", categoria=selected_category))
+        return redirect(url_for("items"))
+
+    @app.post("/itens/movimentar")
+    def adjust_item_stock():
+        if not g.current_user:
+            return redirect(url_for("login"))
+
+        selected_category = request.form.get("categoria") or None
+
+        try:
+            quantity = int(request.form.get("quantity", "0"))
+        except ValueError:
+            flash("Quantidade inválida", "danger")
+            return redirect(url_for("items", categoria=selected_category) if selected_category else url_for("items"))
+
+        if quantity <= 0:
+            flash("Informe uma quantidade maior que zero", "warning")
+            return redirect(url_for("items", categoria=selected_category) if selected_category else url_for("items"))
+
+        direction = request.form.get("direction", "entrada")
+        signed_quantity = quantity if direction == "entrada" else -quantity
+        movement_type = request.form.get("movement_type") or direction
+
+        try:
+            service.register_movement(
+                user=g.current_user,
+                item_id=request.form.get("item_id", ""),
+                quantity=signed_quantity,
+                movement_type=movement_type,
+                notes=request.form.get("notes") or None,
+            )
+        except InventoryError as exc:
+            flash(str(exc), "danger")
+        else:
+            verb = "entrada" if signed_quantity > 0 else "baixa"
+            flash(f"{verb.capitalize()} registrada com sucesso!", "success")
 
         if selected_category:
             return redirect(url_for("items", categoria=selected_category))
