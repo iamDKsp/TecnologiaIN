@@ -42,8 +42,9 @@ class InventoryService:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _require_role(self, user: User, allowed: Iterable[Role]) -> None:
-        if user.role not in allowed:
+    def _require_role(self, user: User, minimum: Role) -> None:
+        allowed = ROLE_HIERARCHY[user.role]
+        if minimum not in allowed:
             raise PermissionDenied(
                 f"Usuário {user.email} não possui permissão para esta operação."
             )
@@ -160,7 +161,7 @@ class InventoryService:
         tags: Optional[Iterable[str]] = None,
         attachments: Optional[Iterable[str]] = None,
     ) -> Item:
-        self._require_role(user, ROLE_HIERARCHY[Role.MANAGER])
+        self._require_role(user, Role.MANAGER)
         self._get_category_or_raise(category_id)
 
         if quantity < 0 or minimum_quantity < 0:
@@ -199,7 +200,7 @@ class InventoryService:
         return item
 
     def update_item(self, *, user: User, item_id: str, **updates: object) -> Item:
-        self._require_role(user, ROLE_HIERARCHY[Role.MANAGER])
+        self._require_role(user, Role.MANAGER)
         item = self._get_item_or_raise(item_id)
 
         supported = {
@@ -235,7 +236,7 @@ class InventoryService:
         return updated
 
     def remove_item(self, *, user: User, item_id: str, reason: str) -> None:
-        self._require_role(user, ROLE_HIERARCHY[Role.MANAGER])
+        self._require_role(user, Role.MANAGER)
         item = self._get_item_or_raise(item_id)
         del self._items[item_id]
         self._append_audit(
@@ -271,7 +272,7 @@ class InventoryService:
         movement_type: str,
         notes: Optional[str] = None,
     ) -> Movement:
-        self._require_role(user, ROLE_HIERARCHY[Role.OPERATOR])
+        self._require_role(user, Role.OPERATOR)
         if quantity == 0:
             raise ValidationError("Movimentações devem alterar a quantidade")
 
@@ -360,7 +361,7 @@ class InventoryService:
     def generate_report(
         self, *, user: User, name: str, parameters: Optional[Dict[str, object]] = None
     ) -> Report:
-        self._require_role(user, ROLE_HIERARCHY[Role.MANAGER])
+        self._require_role(user, Role.MANAGER)
         parameters = parameters or {}
 
         if name == "estoque_atual":
@@ -433,7 +434,7 @@ class InventoryService:
         recipients: List[str],
         cron_expression: str,
     ) -> ScheduledReport:
-        self._require_role(user, ROLE_HIERARCHY[Role.MANAGER])
+        self._require_role(user, Role.MANAGER)
         schedule = ScheduledReport(
             id=str(uuid4()),
             report_name=report_name,
