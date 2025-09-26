@@ -42,6 +42,23 @@
       Ajustar estoque
     </button>
     <a class="btn btn-primary btn-lg" href="{{ url_for('new_item') }}">Novo item</a>
+    <a class="btn btn-soft-secondary btn-lg" href="{{ url_for('export_items') }}">Exportar Excel</a>
+    <form
+      action="{{ url_for('import_items') }}"
+      class="d-inline"
+      enctype="multipart/form-data"
+      id="itemsImportForm"
+      method="post"
+    >
+      <input
+        accept=".xlsx"
+        class="excel-import-input visually-hidden"
+        id="itemsImportInput"
+        name="file"
+        type="file"
+      >
+      <label class="btn btn-soft-primary btn-lg mb-0" for="itemsImportInput">Importar Excel</label>
+    </form>
   </div>
   {% endif %}
 </div>

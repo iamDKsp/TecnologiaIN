@@ -48,6 +48,16 @@ Sistema de inventário de T.I construído como prova de conceito em Python.
 3. Acesse o navegador, escolha um dos usuários de demonstração e navegue pelas
    seções de dashboard, itens, categorias, movimentações e auditoria.
 
+### Importar ou exportar registros em Excel
+
+- **Exportar**: em Itens, Categorias ou Movimentações clique em “Exportar
+  Excel” para baixar um arquivo `.xlsx` com os dados listados.
+- **Importar**: utilize o botão “Importar Excel” nas mesmas páginas para enviar
+  uma planilha `.xlsx`. As colunas esperadas são exibidas no cabeçalho do
+  arquivo exportado e permitem criar novos registros ou atualizar os existentes.
+  Apenas usuários com perfil de gestor podem realizar importações ou edições em
+  massa.
+
 ## Como executar os testes
 
 ```bash

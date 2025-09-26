@@ -38,6 +38,29 @@ def category(service: InventoryService):
     )
 
 
+def test_update_category_metadata(service, manager, category):
+    network = service.create_category(name="Rede", parent_id=category.id)
+
+    updated = service.update_category(
+        user=manager,
+        category_id=network.id,
+        name="Infraestrutura",
+        description="Equipamentos de conectividade",
+        color="#f97316",
+    )
+
+    assert updated.name == "Infraestrutura"
+    assert updated.description == "Equipamentos de conectividade"
+    assert updated.color == "#f97316"
+
+    with pytest.raises(ValidationError):
+        service.update_category(
+            user=manager,
+            category_id=category.id,
+            parent_id=network.id,
+        )
+
+
 def test_create_item_and_low_stock_notification(service, manager, category):
     item = service.create_item(
         user=manager,

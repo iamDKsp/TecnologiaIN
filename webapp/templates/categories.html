@@ -44,15 +44,38 @@
   </div>
   <div class="col-lg-7">
     <div class="card shadow-lg h-100 surface-card">
-      <div class="card-header border-0 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Categorias cadastradas</h5>
-        <span class="badge rounded-pill bg-accent">{{ categories|length }}</span>
+      <div class="card-header border-0 d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <h5 class="mb-0">Categorias cadastradas</h5>
+          <span class="badge rounded-pill bg-accent">{{ categories|length }}</span>
+        </div>
+        {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <a class="btn btn-soft-secondary btn-sm" href="{{ url_for('export_categories') }}">Exportar Excel</a>
+          <form
+            action="{{ url_for('import_categories') }}"
+            class="d-inline"
+            enctype="multipart/form-data"
+            id="categoryImportForm"
+            method="post"
+          >
+            <input
+              accept=".xlsx"
+              class="excel-import-input visually-hidden"
+              id="categoryImportInput"
+              name="file"
+              type="file"
+            >
+            <label class="btn btn-soft-primary btn-sm mb-0" for="categoryImportInput">Importar Excel</label>
+          </form>
+        </div>
+        {% endif %}
       </div>
       <div class="card-body">
         {% if categories %}
         <ul class="list-group list-group-flush">
           {% for category in categories %}
-          <li class="list-group-item d-flex justify-content-between align-items-start gap-3">
+          <li class="list-group-item d-flex justify-content-between align-items-start gap-3 flex-wrap">
             <div class="d-flex align-items-start gap-3">
               <span
                 aria-hidden="true"
@@ -72,13 +95,27 @@
               </div>
             </div>
             {% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
-            <form
-              action="{{ url_for('remove_category', category_id=category.id) }}"
-              method="post"
-              onsubmit="return confirm('Remover a categoria {{ category.name }}?');"
-            >
-              <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
-            </form>
+            <div class="d-flex align-items-center gap-2">
+              <button
+                class="btn btn-sm btn-outline-primary"
+                data-action="edit-category"
+                data-category='{{ {
+                  "id": category.id,
+                  "name": category.name,
+                  "description": category.description or "",
+                  "color": category.color,
+                  "parent_id": category.parent_id or ""
+                }|tojson }}'
+                type="button"
+              >Editar</button>
+              <form
+                action="{{ url_for('remove_category', category_id=category.id) }}"
+                method="post"
+                onsubmit="return confirm('Remover a categoria {{ category.name }}?');"
+              >
+                <button class="btn btn-sm btn-outline-danger" type="submit">Remover</button>
+              </form>
+            </div>
             {% endif %}
           </li>
           {% endfor %}
@@ -90,4 +127,104 @@
     </div>
   </div>
 </div>
+
+{% if current_user and Role.MANAGER in role_hierarchy[current_user.role] %}
+<div aria-hidden="true" class="modal fade" id="editCategoryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="editCategoryForm" method="post">
+        <div class="modal-header">
+          <h5 class="modal-title">Editar categoria</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="editCategoryName">Nome</label>
+            <input class="form-control" id="editCategoryName" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="editCategoryDescription">Descrição</label>
+            <textarea class="form-control" id="editCategoryDescription" name="description" rows="2"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="editCategoryParent">Categoria pai</label>
+            <select class="form-select" id="editCategoryParent" name="parent_id">
+              <option value="">Nenhuma</option>
+              {% for category in categories %}
+              <option value="{{ category.id }}">{{ category.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="editCategoryColor">Cor</label>
+            <input class="form-control-color w-100" id="editCategoryColor" name="color" type="color">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+          <button class="btn btn-primary" type="submit">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const modalEl = document.getElementById('editCategoryModal');
+    const form = document.getElementById('editCategoryForm');
+    if (!modalEl || !form) {
+      return;
+    }
+    const nameInput = document.getElementById('editCategoryName');
+    const descriptionInput = document.getElementById('editCategoryDescription');
+    const parentSelect = document.getElementById('editCategoryParent');
+    const colorInput = document.getElementById('editCategoryColor');
+    const actionTemplate = '{{ url_for("update_category", category_id="__CATEGORY__") }}';
+
+    const openModal = (data) => {
+      if (!data || !data.id) {
+        return;
+      }
+      form.action = actionTemplate.replace('__CATEGORY__', data.id);
+      if (nameInput) {
+        nameInput.value = data.name || '';
+      }
+      if (descriptionInput) {
+        descriptionInput.value = data.description || '';
+      }
+      if (parentSelect) {
+        [...parentSelect.options].forEach((option) => {
+          option.disabled = option.value === data.id;
+        });
+        parentSelect.value = data.parent_id || '';
+      }
+      if (colorInput) {
+        colorInput.value = data.color || '#6366f1';
+      }
+
+      if (window.bootstrap && window.bootstrap.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      } else {
+        modalEl.classList.add('show');
+        modalEl.style.display = 'block';
+      }
+    };
+
+    document.querySelectorAll('[data-action="edit-category"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        try {
+          const data = JSON.parse(button.getAttribute('data-category'));
+          openModal(data);
+        } catch (err) {
+          console.error('Não foi possível abrir o modal de edição', err);
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}
+
 {% endblock %}

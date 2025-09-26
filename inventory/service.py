@@ -37,6 +37,8 @@ DEFAULT_TAG_COLOR = "#14b8a6"
 TagInput = Union[Tag, Tuple[str, str], Dict[str, str], str]
 UsageStatusInput = Union[ItemUsageStatus, str, None]
 
+_UNSET = object()
+
 
 class InventoryService:
     """Facade exposing the main use cases of the inventory system."""
@@ -214,6 +216,64 @@ class InventoryService:
         self._categories[category.id] = category
         return category
 
+    def update_category(
+        self,
+        *,
+        user: User,
+        category_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        parent_id: object = _UNSET,
+        color: Optional[str] = None,
+    ) -> Category:
+        """Update a category's basic metadata."""
+
+        self._require_role(user, Role.MANAGER)
+        category = self._get_category_or_raise(category_id)
+
+        parent_specified = parent_id is not _UNSET
+        normalized_parent: Optional[str] = category.parent_id
+        if parent_specified:
+            candidate: Optional[str]
+            if parent_id in (None, ""):
+                candidate = None
+            else:
+                candidate = str(parent_id)
+                if candidate not in self._categories:
+                    raise ValidationError("Categoria pai inexistente")
+                if candidate == category_id:
+                    raise ValidationError("Uma categoria não pode ser pai dela mesma")
+                ancestor = self._categories[candidate]
+                while ancestor.parent_id is not None:
+                    if ancestor.parent_id == category_id:
+                        raise ValidationError("A relação entre categorias criaria um ciclo")
+                    ancestor = self._categories[ancestor.parent_id]
+            normalized_parent = candidate
+
+        updates: Dict[str, object] = {}
+        if name is not None:
+            updates["name"] = name
+        if description is not None:
+            updates["description"] = description
+        if parent_specified and normalized_parent != category.parent_id:
+            updates["parent_id"] = normalized_parent
+        if color is not None:
+            updates["color"] = self._normalize_hex_color(color, default=category.color)
+
+        if not updates:
+            return category
+
+        updated = replace(category, **updates)
+        self._categories[category_id] = updated
+        self._append_audit(
+            user=user,
+            action="atualizar_categoria",
+            entity="category",
+            entity_id=category_id,
+            payload=updates,
+        )
+        return updated
+
     def list_categories(self) -> List[Category]:
         return list(self._categories.values())
 
@@ -319,6 +379,8 @@ class InventoryService:
             "supplier",
             "purchase_date",
             "usage_status",
+            "tags",
+            "attachments",
         }
         invalid = set(updates) - supported
         if invalid:
@@ -326,6 +388,14 @@ class InventoryService:
 
         if "usage_status" in updates:
             updates["usage_status"] = self._coerce_usage_status(updates["usage_status"])
+
+        if "tags" in updates:
+            raw_tags = updates["tags"]
+            coerced_tags = [] if raw_tags is None else [self._coerce_tag(tag) for tag in raw_tags]
+            updates["tags"] = coerced_tags
+
+        if "attachments" in updates and updates["attachments"] is not None:
+            updates["attachments"] = list(updates["attachments"])
 
         updated = replace(item, **updates, updated_at=datetime.utcnow())
         self._items[item_id] = updated
@@ -393,6 +463,7 @@ class InventoryService:
         quantity: int,
         movement_type: str,
         notes: Optional[str] = None,
+        occurred_at: Optional[datetime] = None,
     ) -> Movement:
         self._require_role(user, Role.OPERATOR)
         if quantity == 0:
@@ -403,7 +474,8 @@ class InventoryService:
         if new_quantity < 0:
             raise ValidationError("Quantidade insuficiente em estoque")
 
-        updated_item = replace(item, quantity=new_quantity, updated_at=datetime.utcnow())
+        timestamp = occurred_at or datetime.utcnow()
+        updated_item = replace(item, quantity=new_quantity, updated_at=timestamp)
         self._items[item_id] = updated_item
 
         movement = Movement(
@@ -412,7 +484,7 @@ class InventoryService:
             quantity=quantity,
             movement_type=movement_type,
             responsible_id=user.id,
-            occurred_at=datetime.utcnow(),
+            occurred_at=timestamp,
             notes=notes,
         )
         self._movements[movement.id] = movement
