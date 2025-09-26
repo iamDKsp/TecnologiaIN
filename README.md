@@ -35,6 +35,11 @@ Sistema de inventário de T.I construído como prova de conceito em Python.
    python -m pip install -r requirements.txt
    ```
 
+   > 💡 No Windows, execute o comando acima a partir da **raiz do repositório**
+   > (a pasta que contém `requirements.txt`). Se preferir, rode o script
+   > `scripts/run.ps1`, que automaticamente posiciona o PowerShell no diretório
+   > correto antes de instalar os pacotes.
+
 3. Inicie o servidor Flask apontando para a fábrica de aplicação. Em ambientes
    onde o comando `flask` não está no `PATH` (como instalações da Microsoft
    Store no Windows), utilize o módulo da biblioteca padrão:
@@ -42,6 +47,13 @@ Sistema de inventário de T.I construído como prova de conceito em Python.
    ```bash
    python -m flask --app webapp.app run
    ```
+
+   Caso prefira automatizar esse processo, utilize os scripts utilitários:
+
+   - `scripts/run.sh` (Linux/macOS) — aceite opcional `--skip-install` para
+     reutilizar dependências já instaladas;
+   - `scripts/run.ps1` (Windows PowerShell) — aceite opcional `-SkipInstall`
+     para pular a reinstalação.
 
    Por padrão o sistema ficará disponível em <http://127.0.0.1:5000/>.
 
