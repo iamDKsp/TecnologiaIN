@@ -709,12 +709,18 @@ def register_routes(app: Flask) -> None:
         header = rows[0]
         header_map = {_normalize_header(value): idx for idx, value in enumerate(header) if value}
 
-        name_idx = header_map.get("nome") or header_map.get("name")
+        def _col(*names: str) -> Optional[int]:
+            for name in names:
+                if name in header_map:
+                    return header_map[name]
+            return None
+
+        name_idx = _col("nome", "name")
         if name_idx is None:
             flash("A coluna 'Nome' é obrigatória.", "danger")
             return redirect(url_for("tags"))
 
-        color_idx = header_map.get("cor") or header_map.get("color")
+        color_idx = _col("cor", "color")
 
         existing = {
             tag.name.strip().lower(): tag for tag in service.list_tag_definitions()

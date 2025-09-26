@@ -53,7 +53,7 @@
               <label class="form-label" for="taskStatus">Status inicial</label>
               <select class="form-select" id="taskStatus" name="status">
                 {% for status in TaskStatus %}
-                <option value="{{ status.value }}"{% if status is TaskStatus.PENDING %} selected{% endif %}>{{ status.label }}</option>
+                <option value="{{ status.value }}"{% if status == TaskStatus.PENDING %} selected{% endif %}>{{ status.label }}</option>
                 {% endfor %}
               </select>
             </div>
