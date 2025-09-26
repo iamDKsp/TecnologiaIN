@@ -46,6 +46,15 @@ class Category:
     name: str
     parent_id: Optional[str] = None
     description: Optional[str] = None
+    color: str = "#6366f1"
+
+
+@dataclass(slots=True)
+class Tag:
+    """Visual label associated with an inventory item."""
+
+    name: str
+    color: str
 
 
 @dataclass(slots=True)
@@ -63,19 +72,27 @@ class Item:
     acquisition_value: float
     supplier: Optional[str]
     purchase_date: Optional[datetime]
-    tags: Set[str] = field(default_factory=set)
+    tags: List[Tag] = field(default_factory=list)
     attachments: List[str] = field(default_factory=list)
     status: str = "ativo"
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
-    def apply_tags(self, *tags: str) -> None:
-        self.tags.update(tag.lower() for tag in tags)
+    def apply_tags(self, *tags: Tag) -> None:
+        lookup = {tag.name.strip().lower(): tag for tag in self.tags}
+        for tag in tags:
+            key = tag.name.strip().lower()
+            lookup[key] = Tag(name=tag.name.strip(), color=tag.color)
+        self.tags = list(lookup.values())
         self.updated_at = datetime.utcnow()
 
     def remove_tags(self, *tags: str) -> None:
-        for tag in tags:
-            self.tags.discard(tag.lower())
+        if not tags:
+            return
+        forbidden = {tag.strip().lower() for tag in tags if tag.strip()}
+        if not forbidden:
+            return
+        self.tags = [tag for tag in self.tags if tag.name.strip().lower() not in forbidden]
         self.updated_at = datetime.utcnow()
 
 

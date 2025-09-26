@@ -51,8 +51,8 @@
         <td>{{ item.supplier or '—' }}</td>
         <td>
           {% if item.tags %}
-            {% for tag in item.tags|list|sort %}
-            <span class="badge bg-light text-dark me-1">{{ tag }}</span>
+            {% for tag in item.tags|sort(attribute='name') %}
+            <span class="tag-chip me-1 mb-1" style="--tag-color: {{ tag.color }}">{{ tag.name }}</span>
             {% endfor %}
           {% else %}
           <span class="text-muted">—</span>

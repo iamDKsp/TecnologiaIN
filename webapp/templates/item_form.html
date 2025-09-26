@@ -48,11 +48,35 @@
     <label class="form-label" for="purchase_date">Data de compra</label>
     <input class="form-control" id="purchase_date" name="purchase_date" type="date">
   </div>
-  <div class="col-md-6">
-    <label class="form-label" for="tags">Tags (separadas por vírgula)</label>
-    <input class="form-control" id="tags" name="tags" placeholder="ex: urgente, manutenção">
+  <div class="col-12">
+    <label class="form-label" for="tagBuilder">Tags</label>
+    <p class="form-text">Adicione etiquetas coloridas para agrupar ou priorizar itens.</p>
+    <div class="tag-builder" id="tagBuilder">
+      <div class="tag-row row g-2 align-items-center mb-2">
+        <div class="col-md-6">
+          <input
+            class="form-control"
+            name="tag_names[]"
+            placeholder="Nome da tag"
+          >
+        </div>
+        <div class="col-md-4">
+          <input
+            class="form-control-color w-100"
+            name="tag_colors[]"
+            title="Cor da tag"
+            type="color"
+            value="#14b8a6"
+          >
+        </div>
+        <div class="col-md-2 text-md-end">
+          <button class="btn btn-outline-danger btn-sm remove-tag mt-2 mt-md-0" type="button">Remover</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-sm btn-outline-primary" id="addTag" type="button">Adicionar tag</button>
   </div>
-  <div class="col-md-6">
+  <div class="col-12">
     <label class="form-label" for="attachments">Anexos (um por linha)</label>
     <textarea class="form-control" id="attachments" name="attachments" rows="2" placeholder="URL ou referência"></textarea>
   </div>
@@ -61,4 +85,50 @@
     <a class="btn btn-outline-secondary" href="{{ url_for('items') }}">Cancelar</a>
   </div>
 </form>
+<script>
+  (function () {
+    const builder = document.getElementById('tagBuilder');
+    const addButton = document.getElementById('addTag');
+    if (!builder || !addButton) return;
+
+    const template = builder.querySelector('.tag-row');
+    const defaultColor = '#14b8a6';
+
+    const bindRemove = (row) => {
+      const removeButton = row.querySelector('.remove-tag');
+      if (!removeButton) return;
+      removeButton.addEventListener('click', () => {
+        const rows = builder.querySelectorAll('.tag-row');
+        if (rows.length === 1) {
+          const nameInput = row.querySelector("input[name='tag_names[]']");
+          const colorInput = row.querySelector("input[name='tag_colors[]']");
+          if (nameInput) nameInput.value = '';
+          if (colorInput) colorInput.value = defaultColor;
+          return;
+        }
+        row.remove();
+      });
+    };
+
+    const createRow = () => {
+      const clone = template.cloneNode(true);
+      clone.querySelectorAll('input').forEach((input) => {
+        if (input.name === 'tag_names[]') {
+          input.value = '';
+        }
+        if (input.name === 'tag_colors[]') {
+          input.value = defaultColor;
+        }
+      });
+      bindRemove(clone);
+      builder.appendChild(clone);
+    };
+
+    bindRemove(template);
+
+    addButton.addEventListener('click', () => {
+      createRow();
+    });
+  })();
+</script>
 {% endblock %}

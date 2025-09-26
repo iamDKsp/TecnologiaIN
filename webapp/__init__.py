@@ -45,16 +45,20 @@ def create_app() -> Flask:
     )
 
     hardware = service.create_category(
-        name="Hardware", description="Servidores, notebooks e periféricos"
+        name="Hardware",
+        description="Servidores, notebooks e periféricos",
+        color="#4f46e5",
     )
     service.create_category(
         name="Software",
         description="Licenças e assinaturas",
+        color="#0ea5e9",
     )
     networking = service.create_category(
         name="Rede",
         description="Switches, roteadores e cabos",
         parent_id=hardware.id,
+        color="#f97316",
     )
 
     service.create_item(
@@ -69,7 +73,7 @@ def create_app() -> Flask:
         acquisition_value=8200.0,
         supplier="Dell",
         purchase_date=datetime.utcnow(),
-        tags=["desenvolvimento", "prioritario"],
+        tags=[("Desenvolvimento", "#14b8a6"), ("Prioritário", "#f97316")],
     )
     service.create_item(
         user=admin,
@@ -83,7 +87,7 @@ def create_app() -> Flask:
         acquisition_value=12500.0,
         supplier="Cisco",
         purchase_date=datetime.utcnow(),
-        tags=["rede"],
+        tags=[("Rede", "#22d3ee")],
     )
 
     app.config["inventory_service"] = service
@@ -171,9 +175,15 @@ def register_routes(app: Flask) -> None:
             name = request.form.get("name", "").strip()
             description = request.form.get("description") or None
             parent_id = request.form.get("parent_id") or None
+            color = request.form.get("color") or None
             if name:
                 try:
-                    service.create_category(name=name, description=description, parent_id=parent_id)
+                    service.create_category(
+                        name=name,
+                        description=description,
+                        parent_id=parent_id,
+                        color=color,
+                    )
                 except ValidationError as exc:
                     flash(str(exc), "danger")
                 else:
@@ -244,7 +254,14 @@ def register_routes(app: Flask) -> None:
                     except ValueError:
                         flash("Data de compra inválida", "danger")
                         return render_template("item_form.html", categories=categories)
-                tags = [tag.strip() for tag in form.get("tags", "").split(",") if tag.strip()]
+                tag_names = form.getlist("tag_names[]")
+                tag_colors = form.getlist("tag_colors[]")
+                tags = []
+                for name_tag, hex_color in zip(tag_names, tag_colors):
+                    cleaned = (name_tag or "").strip()
+                    if not cleaned:
+                        continue
+                    tags.append((cleaned, hex_color or None))
                 attachments = [a.strip() for a in form.get("attachments", "").splitlines() if a.strip()]
                 try:
                     service.create_item(

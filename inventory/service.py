@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 from dataclasses import replace
 from datetime import datetime, timedelta
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 from uuid import uuid4
 
 from .models import (
@@ -20,10 +21,18 @@ from .models import (
     Report,
     Role,
     ROLE_HIERARCHY,
+    Tag,
     ScheduledReport,
     User,
     ValidationError,
 )
+
+
+HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+DEFAULT_CATEGORY_COLOR = "#6366f1"
+DEFAULT_TAG_COLOR = "#14b8a6"
+
+TagInput = Union[Tag, Tuple[str, str], Dict[str, str], str]
 
 
 class InventoryService:
@@ -72,6 +81,40 @@ class InventoryService:
         notification = Notification(id=str(uuid4()), message=message, severity=severity)
         self._notifications[notification.id] = notification
         return notification
+
+    def _normalize_hex_color(self, color: Optional[str], *, default: str) -> str:
+        if not color:
+            return default
+        candidate = color.strip()
+        if not HEX_COLOR_RE.fullmatch(candidate):
+            raise ValidationError("Cor inválida. Use o formato hexadecimal #RRGGBB")
+        return candidate.lower()
+
+    def _coerce_tag(self, raw: TagInput) -> Tag:
+        if isinstance(raw, Tag):
+            name = raw.name.strip()
+            if not name:
+                raise ValidationError("Nome da tag é obrigatório")
+            color = self._normalize_hex_color(raw.color, default=DEFAULT_TAG_COLOR)
+            return Tag(name=name, color=color)
+
+        if isinstance(raw, tuple) and len(raw) == 2:
+            name, color = raw
+        elif isinstance(raw, dict):
+            name = raw.get("name") or raw.get("label")
+            color = raw.get("color")
+        elif isinstance(raw, str):
+            name = raw
+            color = DEFAULT_TAG_COLOR
+        else:  # pragma: no cover - defensive branch
+            raise ValidationError("Formato de tag inválido")
+
+        if not name or not str(name).strip():
+            raise ValidationError("Nome da tag é obrigatório")
+
+        normalized_name = str(name).strip()
+        normalized_color = self._normalize_hex_color(str(color) if color is not None else None, default=DEFAULT_TAG_COLOR)
+        return Tag(name=normalized_name, color=normalized_color)
 
     def _get_category_or_raise(self, category_id: str) -> Category:
         try:
@@ -124,12 +167,24 @@ class InventoryService:
     # Categories
     # ------------------------------------------------------------------
     def create_category(
-        self, *, name: str, description: Optional[str] = None, parent_id: Optional[str] = None
+        self,
+        *,
+        name: str,
+        description: Optional[str] = None,
+        parent_id: Optional[str] = None,
+        color: Optional[str] = None,
     ) -> Category:
         if parent_id and parent_id not in self._categories:
             raise ValidationError("Categoria pai inexistente")
 
-        category = Category(id=str(uuid4()), name=name, parent_id=parent_id, description=description)
+        normalized_color = self._normalize_hex_color(color, default=DEFAULT_CATEGORY_COLOR)
+        category = Category(
+            id=str(uuid4()),
+            name=name,
+            parent_id=parent_id,
+            description=description,
+            color=normalized_color,
+        )
         self._categories[category.id] = category
         return category
 
@@ -178,7 +233,7 @@ class InventoryService:
         acquisition_value: float,
         supplier: Optional[str],
         purchase_date: Optional[datetime],
-        tags: Optional[Iterable[str]] = None,
+        tags: Optional[Iterable[TagInput]] = None,
         attachments: Optional[Iterable[str]] = None,
     ) -> Item:
         self._require_role(user, Role.MANAGER)
@@ -201,7 +256,8 @@ class InventoryService:
             purchase_date=purchase_date,
         )
         if tags:
-            item.apply_tags(*tags)
+            coerced = [self._coerce_tag(tag) for tag in tags]
+            item.apply_tags(*coerced)
         if attachments:
             item.attachments.extend(attachments)
 

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from inventory.models import NotFoundError, Role, ValidationError
-from inventory.service import InventoryService
+from inventory.service import DEFAULT_TAG_COLOR, InventoryService
 
 
 @pytest.fixture()
@@ -31,7 +31,11 @@ def operator(service: InventoryService):
 
 @pytest.fixture()
 def category(service: InventoryService):
-    return service.create_category(name="Hardware", description="Equipamentos físicos")
+    return service.create_category(
+        name="Hardware",
+        description="Equipamentos físicos",
+        color="#0ea5e9",
+    )
 
 
 def test_create_item_and_low_stock_notification(service, manager, category):
@@ -47,10 +51,14 @@ def test_create_item_and_low_stock_notification(service, manager, category):
         acquisition_value=5000.0,
         supplier="Dell",
         purchase_date=datetime.utcnow(),
-        tags=["novo", "prioritario"],
+        tags=[("Novo", "#22d3ee"), ("Prioritário", "#f97316")],
     )
 
     assert item.quantity == 2
+    assert {tag.name.lower(): tag.color for tag in item.tags} == {
+        "novo": "#22d3ee",
+        "prioritário": "#f97316",
+    }
     assert any("estoque crítico" in n.message.lower() for n in service.list_notifications())
 
 
@@ -187,7 +195,7 @@ def test_delete_item_and_audit(service, manager, category):
 
 
 def test_delete_category_without_dependencies(service, manager):
-    orphan = service.create_category(name="Descartados")
+    orphan = service.create_category(name="Descartados", color="#22d3ee")
 
     service.delete_category(user=manager, category_id=orphan.id)
 
@@ -239,3 +247,27 @@ def test_delete_movement_reverts_stock(service, manager, operator, category):
 
     updated = service.get_item(item.id)
     assert updated.quantity == 5
+
+
+def test_create_category_invalid_color(service):
+    with pytest.raises(ValidationError):
+        service.create_category(name="Impressoras", color="vermelho")
+
+
+def test_create_item_with_string_tags_uses_default_color(service, manager, category):
+    item = service.create_item(
+        user=manager,
+        name="AP Wi-Fi",
+        description="Access point corporativo",
+        category_id=category.id,
+        quantity=3,
+        minimum_quantity=1,
+        serial_number="AP-01",
+        location="Andar 2",
+        acquisition_value=1800.0,
+        supplier="Ubiquiti",
+        purchase_date=datetime.utcnow(),
+        tags=["wireless"],
+    )
+
+    assert item.tags[0].color == DEFAULT_TAG_COLOR
